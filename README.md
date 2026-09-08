@@ -499,7 +499,7 @@ success and on failure.
 | `MLXFAST_RESIDENT_WORKER` | The opt-out. Set it to `0` to measure without a resident. |
 
 The benchmarker passes `BENCH_WORKER_RESIDENT_SOCKET` to the workers it starts
-only from a benchd channel that carries mlxfast-bench #271. An older channel binary
+only from a benchd channel published on or after 2026-09-05. An older channel binary
 removes the name. The worker then serves in its own process and loads the
 weights itself. That is the correct fallback and it changes no measured value.
 

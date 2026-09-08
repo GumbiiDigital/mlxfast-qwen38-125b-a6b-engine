@@ -538,7 +538,7 @@ jobs:
         # rather than only by a dispatch.
         #
         # benchd forwards BENCH_WORKER_RESIDENT_SOCKET to the workers it spawns
-        # only from a channel carrying mlxfast-bench #271. An older channel binary
+        # only from a channel published on or after 2026-09-05. An older channel binary
         # strips it, the spawned worker serves in process and loads the weights
         # itself, and the run is exactly what it is today -- so this step is
         # safe before that change reaches the channel.

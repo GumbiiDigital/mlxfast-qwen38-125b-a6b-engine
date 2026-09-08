@@ -1601,7 +1601,7 @@ never in a measurement beside another owner.
 
 **WHAT benchd DOES WITH THE SOCKET, TODAY.** benchd passes
 `BENCH_WORKER_RESIDENT_SOCKET` to the workers it starts only from a channel
-that carries mlxfast-bench #271, which adds the `BENCH_WORKER_` prefix to the
+published on or after 2026-09-05, which adds the `BENCH_WORKER_` prefix to the
 allowed environment. An older channel binary REMOVES the name. The started
 worker then serves in its own process and loads the weights itself. That is the
 correct fallback: the run measures what it measured before, and the only cost

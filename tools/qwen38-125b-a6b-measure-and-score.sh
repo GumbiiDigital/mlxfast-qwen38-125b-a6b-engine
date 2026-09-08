@@ -52,7 +52,7 @@
 # benchmarkCommand, the ranked workflow step, and a hand invocation on the box.
 #
 # WHAT benchd DOES WITH THE SOCKET. benchd forwards BENCH_WORKER_RESIDENT_SOCKET
-# to the workers it spawns only from a channel that carries mlxfast-bench #271 (the
+# to the workers it spawns only from a channel published on or after 2026-09-05 (the
 # BENCH_WORKER_ prefix allowlist). An older channel binary STRIPS the variable;
 # the spawned worker then serves in process and loads the weights itself, which
 # is the correct fallback and is exactly today's behaviour. So this wiring is
