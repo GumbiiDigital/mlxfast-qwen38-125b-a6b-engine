@@ -78,23 +78,31 @@ The rule behind the list: anything that only **proposes** tokens or computes
 the forward pass is editable. Anything that **verifies**, **measures**, or
 **ledgers** stays trusted.
 
-The editable surface has three groups.
+The editable surface has four groups.
 
 1. **The head declaration.** `mtp-head.manifest.json`. The declaration file
    only. It carries no weights, and no head weights directory exists. See
    section 4.
-2. **The offline transform.** `Sources/MLXFastTransform/`.
-3. **The vendored MLX Metal kernels.** The 68 files the forward pass
+2. **The Runner.** `Runner/`.
+3. **The offline transform.** `Sources/MLXFastTransform/`.
+4. **The vendored MLX Metal kernels.** The 68 files the forward pass
    dispatches: the quantized matmul, the mixture-of-experts gather-GEMM, SDPA
    and steel attention, RoPE, RMSNorm, softmax, sort, reduce, copy,
    elementwise, `arg_reduce`, and gather indexing.
 
-THE ENGINE IS NOT AN EDITABLE PATH. It moved into the `Vendor/mlx-swift-lm`
-submodule, which holds the model, the runner and `bench-worker`. A gitlink
-names a commit, not bytes in this tree, so an editable entry over it would let
-a submission move the engine to a commit nothing here verified. Whether a
-submission may repoint the gitlink at its own fork commit, and under what
-repository allowlist, is not ruled yet.
+THE RUNNER IS EDITABLE, AND IT LIVES IN `Runner/`. It is the model family's
+code: it loads the checkpoint, it declares the manifest, and it builds the
+engine and the one-row stepper. `Sources/BenchWorker/` registers it in
+`RunnerRegistry` before the engine resolves a runner, so it SHADOWS the fork's
+built-in runner for `qwen4_exp` and `qwen4_exp_text`. Keep the manifest as it
+is: the runner manifest digest is a benchd conformance input, and a changed
+digest fails the conformance check.
+
+THE ENGINE CORE IS NOT AN EDITABLE PATH. It is the `Vendor/mlx-swift-lm`
+submodule. A gitlink names a commit, not bytes in this tree, so an editable
+entry over it would let a submission move the engine to a commit nothing here
+verified. Whether a submission may repoint the gitlink at its own fork commit,
+and under what repository allowlist, is not ruled yet.
 
 ### 3.1 Optional paths
 

@@ -159,12 +159,14 @@ checkpoint. See [The MTP head is embedded](#the-mtp-head-is-embedded).
 
 | Path | What it holds | Status |
 |---|---|---|
+| `Runner/` | The track Runner: the Qwen 3.8 Flash-Next model family code and its manifest. | Editable |
+| `Sources/BenchWorker/` | The `bench-worker` shim. It registers the Runner in `Runner/`. | Trusted |
 | `Sources/MLXFastTransform/` | The offline transform that writes `weights/`. | Editable |
 | `Sources/MLXFastCLI/` | The trusted CLI, `mlxfast-swift`. | Trusted |
 | `Sources/MLXFastCore/` | Shared constants and contracts. | Trusted |
 | `Sources/MLXFastTrustedHarness/` | The editable-surface budget, the head declaration reader, transform verification, and the metallib fingerprint. | Trusted |
 | `Vendor/mlx-swift/` | The pinned MLX fork, a vendored tree. The listed Metal kernel sources are editable. | Mixed |
-| `Vendor/mlx-swift-lm/` | The engine fork, a git submodule. It holds the model, the runner, and `bench-worker`. | Submodule |
+| `Vendor/mlx-swift-lm/` | The engine fork, a git submodule. It holds the engine core. | Submodule, not editable |
 | `fixtures/` | The track contract and the pinned checkpoint manifests. | Trusted |
 | `tools/` | Setup, build, lint, and measurement scripts. | Trusted |
 | `benchd-bin/` | Where `./tools/fetch-benchd.sh` installs the verified binary. Git ignores it. | Fetched |
@@ -185,13 +187,20 @@ the usage line.
 ### The engine is a submodule
 
 `Vendor/mlx-swift-lm` is a git submodule. It points to one commit of
-`Layr-Labs/mlx-swift-lm`. That fork holds the three parts of the engine:
+`Layr-Labs/mlx-swift-lm`. That fork holds the engine core:
 
 * the Qwen 3.8 Flash-Next model;
-* `Qwen4ExpRunner`, which loads the checkpoint and builds the engine and the
-  one-row stepper;
-* `bench-worker`, the Engine Protocol v1 server. The benchmarker starts this
-  binary. One binary serves every model family.
+* the runner boundary and the batching engine;
+* the shim body that `Sources/BenchWorker/` builds on.
+
+The submodule is not editable.
+
+The Runner is NOT in the submodule any more. `Runner/` in this repository
+holds it, `Sources/BenchWorker/` registers it, and the registry gives a later
+registration the claim on the model type, so `Runner/` shadows the fork's
+built-in runner. This repository builds its own `bench-worker` from that pair.
+The binary keeps its name and its staged location: benchmarking starts
+`.build/release/bench-worker`, as before.
 
 Clone the repository with `--recurse-submodules`. If you cloned it without that
 option, run `git submodule update --init`.
@@ -254,19 +263,29 @@ rule behind the list is simple. Code that **proposes** tokens or computes the
 forward pass is editable. Code that **verifies**, **measures**, or **ledgers**
 stays trusted.
 
-The editable surface has three groups.
+The editable surface has four groups.
 
 1. The head declaration. `mtp-head.manifest.json`. The declaration file only.
-2. The offline transform. `Sources/MLXFastTransform/`.
-3. The 68 vendored MLX Metal kernel files the forward pass dispatches. These
+2. The Runner. `Runner/`.
+3. The offline transform. `Sources/MLXFastTransform/`.
+4. The 68 vendored MLX Metal kernel files the forward pass dispatches. These
    are the quantized matmul, the MoE gather-GEMM, SDPA and steel attention,
    RoPE, RMSNorm, softmax, sort, reduce, copy, elementwise, `arg_reduce`, and
    gather indexing.
 
-The engine moved into the `Vendor/mlx-swift-lm` submodule, so the model files,
-the runner and the batching engine are no longer files in this tree. A gitlink
-names a commit, not bytes, so it is not an editable path. Whether a submission
-may repoint the gitlink at its own fork commit is not ruled yet.
+### The Runner
+
+The Runner in `Runner/` is editable. It is the model family's code: it loads
+the checkpoint, it declares the manifest, and it builds the engine and the
+one-row stepper. `Sources/BenchWorker/` registers it in `RunnerRegistry`
+before the engine resolves a runner, so it SHADOWS the fork's built-in runner
+for `qwen4_exp` and `qwen4_exp_text`. The `Vendor/mlx-swift-lm` submodule is
+not editable: it holds the engine core, a gitlink names a commit and not
+bytes, and whether a submission may repoint it at its own fork commit is not
+ruled yet.
+
+Keep the manifest as it is. The runner manifest digest is a benchd
+conformance input, and a changed digest fails the conformance check.
 
 ### The MTP head declaration
 

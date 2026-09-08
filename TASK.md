@@ -30,12 +30,14 @@ groups.
 | Group | Paths |
 |---|---|
 | The head declaration | `mtp-head.manifest.json` (the declaration file only) |
+| The Runner | `Runner/` |
 | The offline transform | `Sources/MLXFastTransform/` |
 | The vendored kernels | The 68 MLX Metal files the forward pass dispatches |
 
-The engine is the `Vendor/mlx-swift-lm` submodule. A gitlink names a commit,
-not bytes, so the model files, the runner and the batching engine are not
-editable paths.
+The Runner in `Runner/` is editable. `Sources/BenchWorker/` registers it
+before the engine resolves a runner, so it shadows the fork's built-in runner.
+The engine core is the `Vendor/mlx-swift-lm` submodule and it is not editable:
+a gitlink names a commit, not bytes.
 
 The rule behind the list is simple. Code that **proposes** tokens or computes
 the forward pass is editable. Code that **verifies**, **measures**, or
