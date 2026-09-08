@@ -1,0 +1,231 @@
+{
+  "schema_version": 1,
+  "track_id": "qwen3.8-125b-a6b-mlx-v1",
+  "track_name": "Qwen 3.8 125B A6B MLX -- composite cohort speedup",
+  "official_scoring_enabled": true,
+  "runner": {
+    "provider": "github-actions",
+    "workflow": "benchmark.yml",
+    "maxConcurrentWorkflows": 1
+  },
+  "allowed_modes": [
+    "serial",
+    "mtp"
+  ],
+  "benchmark_name": "mlxfast-qwen38-125b-a6b",
+  "kv_backend": "contiguous",
+  "ngram_shard_dir": "weights",
+  "scored_batch_size": 1,
+  "scored_exponents": {
+    "prefill_gain_exponent": 0.25,
+    "decode_gain_exponent": 0.75
+  },
+  "live_golden": "botany",
+  "timed_prompt_pool": [
+    {
+      "r2_path": "correctness_prompts/qwen3.8-125b-a6b-mlx-v1/beagle.golden.json",
+      "sha256": "51d1dc9487afdb07fb184bc12a6d8705768d402b2285ceb7a50e592030c4d9e6",
+      "bytes": 53240
+    },
+    {
+      "r2_path": "correctness_prompts/qwen3.8-125b-a6b-mlx-v1/plutarch.golden.json",
+      "sha256": "68f148e14cbfd784a884ee41e3b706e2b5245fda7ba1338aea7a4530f045bdd5",
+      "bytes": 53233
+    },
+    {
+      "r2_path": "correctness_prompts/qwen3.8-125b-a6b-mlx-v1/medicine.golden.json",
+      "sha256": "52430c067e9da23ac3c4091f73825f5d2ddae217d2820b419b92ad9587f46126",
+      "bytes": 53704
+    },
+    {
+      "r2_path": "correctness_prompts/qwen3.8-125b-a6b-mlx-v1/travel.golden.json",
+      "sha256": "f413d16b840d178a448ad17f8e07794268bc890f8dc2e3294949e16c22f72fa3",
+      "bytes": 53233
+    },
+    {
+      "r2_path": "correctness_prompts/qwen3.8-125b-a6b-mlx-v1/drama.golden.json",
+      "sha256": "31daa033a638f47ce5ead73a4b6d3fefbf83bceb9def094c0c66b77d19859289",
+      "bytes": 53349
+    },
+    {
+      "r2_path": "correctness_prompts/qwen3.8-125b-a6b-mlx-v1/essays.golden.json",
+      "sha256": "84fb6ea7a6cbc6adc3058fc682cacbe1a4c1298294176d6dbf429bb03f6091fc",
+      "bytes": 53361
+    },
+    {
+      "r2_path": "correctness_prompts/qwen3.8-125b-a6b-mlx-v1/botany.golden.json",
+      "sha256": "d42b70f0165c4372954ffa99414d61e553ac9c0a12a6283d016cd51283306379",
+      "bytes": 53697
+    },
+    {
+      "r2_path": "correctness_prompts/qwen3.8-125b-a6b-mlx-v1/republic.golden.json",
+      "sha256": "47e0124667bceaa5fba1993c3dd0ad522fe810995116c58298e38b601ffcda36",
+      "bytes": 53310
+    }
+  ],
+  "hidden_correctness_golden": {
+    "sha256": "d42b70f0165c4372954ffa99414d61e553ac9c0a12a6283d016cd51283306379",
+    "bytes": 53697
+  },
+  "mlx_swift_lm_revision": "449f2d01b39f9088739c98d80a4f8a1b3cfa105e",
+  "target": {
+    "upstream_model_id": "Vontra/Qwen3.8-Flash-Next-MLX-4bit-MTP",
+    "upstream_revision": "327c8a604de613b42f84ba5e6b796c0931e8aa3b",
+    "architecture": "qwen4_exp",
+    "model_type": "qwen4_exp_text",
+    "num_hidden_layers": 48,
+    "hidden_size": 2560,
+    "vocab_size": 248320,
+    "max_position_embeddings": 262144,
+    "num_attention_heads": 24,
+    "num_key_value_heads": 2,
+    "head_dim": 256,
+    "partial_rotary_factor": 0.25,
+    "rope_theta": 10000000,
+    "mrope_interleaved": true,
+    "mrope_section": [
+      11,
+      11,
+      10
+    ],
+    "full_attention_interval": 4,
+    "full_attention_layer_indices": [
+      3,
+      7,
+      11,
+      15,
+      19,
+      23,
+      27,
+      31,
+      35,
+      39,
+      43,
+      47
+    ],
+    "linear_attention_layer_count": 36,
+    "linear_num_key_heads": 16,
+    "linear_num_value_heads": 48,
+    "linear_key_head_dim": 128,
+    "linear_value_head_dim": 128,
+    "linear_conv_kernel_dim": 4,
+    "indexer_n_heads": 4,
+    "indexer_kv_heads": 1,
+    "indexer_head_dim": 128,
+    "indexer_budget": 2048,
+    "indexer_compress_ratio": 4,
+    "hc_count": 4,
+    "hc_lowrank": 320,
+    "num_experts": 512,
+    "num_experts_per_tok": 10,
+    "moe_intermediate_size": 640,
+    "shared_expert_intermediate_size": 640,
+    "ngram_size": 3,
+    "heads_per_ngram": 8,
+    "ple_layer_ids": [
+      2
+    ],
+    "ple_embed_dim": 2560,
+    "ple_conv_kernel_size": 4,
+    "split_ngram_parts": 128,
+    "ngram_shard_tensor_count": 384,
+    "tie_word_embeddings": false,
+    "bos_token_id": 248044,
+    "pad_token_id": 248044,
+    "eos_token_ids": [
+      248046,
+      248044
+    ],
+    "raw_checkpoint_tensor_count": 3747,
+    "raw_checkpoint_shard_count": 22,
+    "raw_checkpoint_total_size_bytes": 113209155128,
+    "text_tower_tensor_count": 3414,
+    "vision_tower_tensor_count": 333,
+    "vision_tower_loaded": false,
+    "manifest_path": "fixtures/reference_qwen3_8_125b_a6b_4bit.sha256",
+    "config_fixture_path": "fixtures/qwen3_8_125b_a6b_config.json",
+    "tensor_inventory_path": "fixtures/qwen3_8_125b_a6b_tensor_inventory.json",
+    "quantization": {
+      "mode": "affine",
+      "group_size": 32,
+      "bits": 4,
+      "mixed_precision": true
+    },
+    "upstream_base_model": "Qwen/Qwen3.8-Flash-Next",
+    "upstream_base_model_relation": "quantized"
+  },
+  "mtp_head": {
+    "role": "spec_decode_mtp_head",
+    "source": "embedded",
+    "tensor_prefix": "language_model.mtp.",
+    "tensor_count": 76,
+    "num_hidden_layers": 1,
+    "hybrid": true,
+    "layer_types": [
+      "full_attention"
+    ],
+    "rope_theta": 10000000,
+    "use_dedicated_embeddings": false,
+    "permitted_draft_depths": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ]
+  },
+  "protocol": {
+    "mtp_envelope_constants_from_darkbloom": {
+      "fixed_depth": 1,
+      "rectangular_cap": "B * (1 + k) <= 8 on M3 and later"
+    }
+  },
+  "scoring_semantics": {
+    "ruling_verbatim": [
+      "score the qwen 3.8 125b-a6b tracks (mlx and cuda) single-stream, paired serial vs the built-in mtp, on prefill gains ^ .25 * decode ^ .75"
+    ],
+    "ruling_date": "2026-08-27",
+    "formula": "composite = prefill_gain ^ 0.25 * decode_gain ^ 0.75. Per component: gain = baseline_aggregate / candidate_aggregate (serial-anchored -- a faster candidate scores > 1, matching the family's standing convention). aggregate = the PER-PROMPT SUM over the pinned pool, i.e. each pool prompt is timed in its own SINGLE-STREAM window and the elapsed times are added together -- for prefill and decode separately, on both the baseline (serial control) leg and the candidate (built-in mtp) leg, over the SAME prompts."
+  },
+  "license": {
+    "spdx": "other",
+    "license_name": "qwen-community-1.0",
+    "url": "https://huggingface.co/Vontra/Qwen3.8-Flash-Next-MLX-4bit-MTP/blob/327c8a604de613b42f84ba5e6b796c0931e8aa3b/LICENSE",
+    "verified_repositories": [
+      "Vontra/Qwen3.8-Flash-Next-MLX-4bit-MTP"
+    ]
+  },
+  "live_golden_speculative": {
+    "mtp1": {
+      "r2_path": "correctness_prompts/qwen3.8-125b-a6b-mlx-v1/botany.mtp1.golden.json",
+      "sha256": "3d291cada6b858b7fce6c8739e524aa2174832ef53fc04de3b41812dc60f0120",
+      "bytes": 53697
+    },
+    "mtp2": {
+      "r2_path": "correctness_prompts/qwen3.8-125b-a6b-mlx-v1/botany.mtp2.golden.json",
+      "sha256": "3d291cada6b858b7fce6c8739e524aa2174832ef53fc04de3b41812dc60f0120",
+      "bytes": 53697
+    },
+    "mtp3": {
+      "r2_path": "correctness_prompts/qwen3.8-125b-a6b-mlx-v1/botany.mtp3.golden.json",
+      "sha256": "3d291cada6b858b7fce6c8739e524aa2174832ef53fc04de3b41812dc60f0120",
+      "bytes": 53697
+    },
+    "mtp4": {
+      "r2_path": "correctness_prompts/qwen3.8-125b-a6b-mlx-v1/botany.mtp4.golden.json",
+      "sha256": "3d291cada6b858b7fce6c8739e524aa2174832ef53fc04de3b41812dc60f0120",
+      "bytes": 53697
+    },
+    "mtp5": {
+      "r2_path": "correctness_prompts/qwen3.8-125b-a6b-mlx-v1/botany.mtp5.golden.json",
+      "sha256": "3d291cada6b858b7fce6c8739e524aa2174832ef53fc04de3b41812dc60f0120",
+      "bytes": 53697
+    },
+    "mtp6": {
+      "r2_path": "correctness_prompts/qwen3.8-125b-a6b-mlx-v1/botany.mtp6.golden.json",
+      "sha256": "3d291cada6b858b7fce6c8739e524aa2174832ef53fc04de3b41812dc60f0120",
+      "bytes": 53697
+    }
+  }
+}

@@ -1,0 +1,245 @@
+{
+  "schema_version": 2,
+  "track_id": "qwen3.8-125b-a6b-mlx-v1",
+  "upstream_model_id": "Vontra/Qwen3.8-Flash-Next-MLX-4bit-MTP",
+  "upstream_revision": "327c8a604de613b42f84ba5e6b796c0931e8aa3b",
+  "rmsnorm_offset_baked": true,
+  "gated_norm_offset_baked": false,
+  "measurement": {
+    "measured_on": "2026-08-28",
+    "host": "box",
+    "device": "cpu",
+    "read_only": true,
+    "language_model_tensor_count": 193,
+    "vision_tower_tensor_count": 110,
+    "tensor_dtype": "BF16",
+    "tensors_quantized": false,
+    "statistic": "per_family_worst_negative_fraction_and_lowest_mean"
+  },
+  "classified_at_load": {
+    "non_gated_language_model_tensor_count": 157,
+    "max_negative_fraction": 0.055078,
+    "min_mean": 0.235771,
+    "worst_negative_fraction_tensor": "model.layers.0.mlp_hyper_connection.hc_norm",
+    "lowest_mean_tensor": "mtp.pre_fc_norm_embedding"
+  },
+  "non_gated_families": [
+    {
+      "family": "model.hyper_connection_mixer.hc_norm",
+      "tensor_count": 1,
+      "max_negative_fraction": 0.0,
+      "min_mean": 3.749807,
+      "min_value": 0.6328,
+      "max_value": 13.375
+    },
+    {
+      "family": "model.layers.*.attn_hyper_connection.hc_norm",
+      "tensor_count": 48,
+      "max_negative_fraction": 0.034668,
+      "min_mean": 0.675863,
+      "min_value": -4.9375,
+      "max_value": 7.625
+    },
+    {
+      "family": "model.layers.*.mlp_hyper_connection.hc_norm",
+      "tensor_count": 48,
+      "max_negative_fraction": 0.055078,
+      "min_mean": 0.881879,
+      "min_value": -2.9062,
+      "max_value": 7.5938
+    },
+    {
+      "family": "model.layers.*.ple.norm_conv",
+      "tensor_count": 1,
+      "max_negative_fraction": 0.0,
+      "min_mean": 0.890627,
+      "min_value": 0.543,
+      "max_value": 1.2734
+    },
+    {
+      "family": "model.layers.*.ple.norm_key",
+      "tensor_count": 1,
+      "max_negative_fraction": 0.0,
+      "min_mean": 0.893291,
+      "min_value": 0.6719,
+      "max_value": 1.8594
+    },
+    {
+      "family": "model.layers.*.ple.norm_query",
+      "tensor_count": 1,
+      "max_negative_fraction": 0.0,
+      "min_mean": 0.893296,
+      "min_value": 0.6719,
+      "max_value": 1.8594
+    },
+    {
+      "family": "model.layers.*.self_attn.indexer.k_layernorm",
+      "tensor_count": 12,
+      "max_negative_fraction": 0.0,
+      "min_mean": 0.925934,
+      "min_value": 0.5,
+      "max_value": 1.0859
+    },
+    {
+      "family": "model.layers.*.self_attn.indexer.q_layernorm",
+      "tensor_count": 12,
+      "max_negative_fraction": 0.0,
+      "min_mean": 0.923889,
+      "min_value": 0.5,
+      "max_value": 1.0859
+    },
+    {
+      "family": "model.layers.*.self_attn.k_norm",
+      "tensor_count": 12,
+      "max_negative_fraction": 0.003906,
+      "min_mean": 1.273514,
+      "min_value": -0.0156,
+      "max_value": 2.1719
+    },
+    {
+      "family": "model.layers.*.self_attn.q_norm",
+      "tensor_count": 12,
+      "max_negative_fraction": 0.003906,
+      "min_mean": 1.283325,
+      "min_value": -0.0078,
+      "max_value": 2.375
+    },
+    {
+      "family": "mtp.hyper_connection_mixer.hc_norm",
+      "tensor_count": 1,
+      "max_negative_fraction": 0.0,
+      "min_mean": 4.788189,
+      "min_value": 0.668,
+      "max_value": 14.875
+    },
+    {
+      "family": "mtp.layers.*.attn_hyper_connection.hc_norm",
+      "tensor_count": 1,
+      "max_negative_fraction": 0.0,
+      "min_mean": 1.275108,
+      "min_value": 0.1172,
+      "max_value": 10.9375
+    },
+    {
+      "family": "mtp.layers.*.mlp_hyper_connection.hc_norm",
+      "tensor_count": 1,
+      "max_negative_fraction": 0.0,
+      "min_mean": 2.731141,
+      "min_value": 0.3438,
+      "max_value": 13.375
+    },
+    {
+      "family": "mtp.layers.*.self_attn.indexer.k_layernorm",
+      "tensor_count": 1,
+      "max_negative_fraction": 0.0,
+      "min_mean": 1.08194,
+      "min_value": 0.0938,
+      "max_value": 1.4062
+    },
+    {
+      "family": "mtp.layers.*.self_attn.indexer.q_layernorm",
+      "tensor_count": 1,
+      "max_negative_fraction": 0.0,
+      "min_mean": 1.098694,
+      "min_value": 0.7266,
+      "max_value": 1.3359
+    },
+    {
+      "family": "mtp.layers.*.self_attn.k_norm",
+      "tensor_count": 1,
+      "max_negative_fraction": 0.0,
+      "min_mean": 3.676636,
+      "min_value": 0.1953,
+      "max_value": 7.3125
+    },
+    {
+      "family": "mtp.layers.*.self_attn.q_norm",
+      "tensor_count": 1,
+      "max_negative_fraction": 0.0,
+      "min_mean": 3.67691,
+      "min_value": 0.0039,
+      "max_value": 7.2812
+    },
+    {
+      "family": "mtp.pre_fc_norm_embedding",
+      "tensor_count": 1,
+      "max_negative_fraction": 0.0,
+      "min_mean": 0.235771,
+      "min_value": 0.1211,
+      "max_value": 0.7266
+    },
+    {
+      "family": "mtp.pre_fc_norm_hidden",
+      "tensor_count": 1,
+      "max_negative_fraction": 0.00293,
+      "min_mean": 0.671649,
+      "min_value": -0.1328,
+      "max_value": 1.375
+    }
+  ],
+  "gated_families": [
+    {
+      "family": "model.layers.*.linear_attn.norm",
+      "tensor_count": 36,
+      "max_negative_fraction": 0.0,
+      "min_mean": 0.966766,
+      "min_value": 0.875,
+      "max_value": 1.5781
+    }
+  ],
+  "never_classified_vision_families": [
+    {
+      "family": "vision_tower.blocks.*.norm1.bias",
+      "tensor_count": 27,
+      "max_negative_fraction": 0.507812,
+      "min_mean": -0.000732,
+      "min_value": -15.25,
+      "max_value": 6.9375
+    },
+    {
+      "family": "vision_tower.blocks.*.norm1.weight",
+      "tensor_count": 27,
+      "max_negative_fraction": 0.305556,
+      "min_mean": 0.466314,
+      "min_value": -0.5312,
+      "max_value": 3.1406
+    },
+    {
+      "family": "vision_tower.blocks.*.norm2.bias",
+      "tensor_count": 27,
+      "max_negative_fraction": 0.572049,
+      "min_mean": -0.283872,
+      "min_value": -25.625,
+      "max_value": 14.875
+    },
+    {
+      "family": "vision_tower.blocks.*.norm2.weight",
+      "tensor_count": 27,
+      "max_negative_fraction": 0.199653,
+      "min_mean": 0.923918,
+      "min_value": -1.2109,
+      "max_value": 17.5
+    },
+    {
+      "family": "vision_tower.merger.norm.bias",
+      "tensor_count": 1,
+      "max_negative_fraction": 0.452257,
+      "min_mean": 0.023957,
+      "min_value": -11.9375,
+      "max_value": 2.9688
+    },
+    {
+      "family": "vision_tower.merger.norm.weight",
+      "tensor_count": 1,
+      "max_negative_fraction": 0.0,
+      "min_mean": 1.174581,
+      "min_value": 0.3594,
+      "max_value": 2.0625
+    }
+  ],
+  "absent_families": [
+    "input_layernorm",
+    "post_attention_layernorm",
+    "model.norm"
+  ]
+}
