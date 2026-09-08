@@ -264,6 +264,15 @@ fi
 LIVE_GOLDEN_SHA256="$(printf '%s' "${live_golden_entry}" | jq -r '.sha256 // empty')"
 LIVE_GOLDEN_BYTES="$(printf '%s' "${live_golden_entry}" | jq -r '.bytes // empty')"
 
+# THE SERIAL GOLDEN, kept aside before any per-depth override below. The
+# serial-control leg (leg 1) is serial by construction, so benchd verifies it
+# against THIS tape (--control-golden); the per-depth tape is the candidate
+# leg's oracle only. On the MLX engine the depth-1 tape forks from the serial
+# tape at step 1, so a control leg checked against it dies at step 1.
+SERIAL_GOLDEN_BASENAME="${LIVE_GOLDEN_BASENAME}"
+SERIAL_GOLDEN_SHA256="${LIVE_GOLDEN_SHA256}"
+SERIAL_GOLDEN_BYTES="${LIVE_GOLDEN_BYTES}"
+
 # PER-DEPTH ORACLE (David ruling 2026-09-07, the CUDA track's shape). A window
 # verified in one target forward does not reproduce the serial tape token for
 # token (the kernels differ at M > 1), so a speculative declaration scores
@@ -616,6 +625,24 @@ if [[ -z "${RUNNER_NAME:-}" ]]; then
   fi
 fi
 
+
+# --control-golden: the serial tape for the serial-control leg. A benchd that
+# does not know the flag verifies leg 1 against the candidate's per-depth tape,
+# which is only the same tape at depth 0; a speculative declaration on such a
+# benchd is refused rather than measured against the wrong oracle.
+CONTROL_GOLDEN_PATH="${GOLDEN_DIR}/${SERIAL_GOLDEN_BASENAME}"
+CONTROL_ARGS=()
+if "${BENCHD}" iterate --help 2>&1 | grep -q -- '--control-golden'; then
+  if [[ ! -f "${CONTROL_GOLDEN_PATH}" ]]; then
+    echo "qwen38-125b-a6b-measure-and-score.sh: serial golden not found at ${CONTROL_GOLDEN_PATH}; the serial-control leg has no tape to verify against." >&2
+    exit 1
+  fi
+  CONTROL_ARGS=(--control-golden "${CONTROL_GOLDEN_PATH}" --control-golden-sha256 "${SERIAL_GOLDEN_SHA256}" --control-golden-bytes "${SERIAL_GOLDEN_BYTES}")
+  echo "qwen38-125b-a6b-measure-and-score.sh: serial-control leg verifies against ${SERIAL_GOLDEN_BASENAME} (sha256 ${SERIAL_GOLDEN_SHA256}, ${SERIAL_GOLDEN_BYTES} bytes)" >&2
+elif [[ "${SPEC_DESC}" != "serial" ]]; then
+  echo "qwen38-125b-a6b-measure-and-score.sh: REFUSING -- the declaration is ${SPEC_DESC} but this benchd has no --control-golden; the serial-control leg would be verified against the ${SPEC_DESC} tape." >&2
+  exit 1
+fi
 exec "${BENCHD}" iterate \
   --engine "${ENGINE_BIN_REL}" \
   ${ENGINE_RESOURCE_ARGS[@]+"${ENGINE_RESOURCE_ARGS[@]}"} \
@@ -625,6 +652,7 @@ exec "${BENCHD}" iterate \
   --mode official \
   --baseline-workspace "${BASELINE_WORKSPACE}" \
   --baseline-calibration "${BASELINE_CALIBRATION}" \
+  ${CONTROL_ARGS[@]+"${CONTROL_ARGS[@]}"} \
   ${BOX_ARGS[@]+"${BOX_ARGS[@]}"} \
   --score-path "${SCORE_PATH}" \
   --golden-sha256 "${LIVE_GOLDEN_SHA256}" \

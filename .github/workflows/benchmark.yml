@@ -514,7 +514,7 @@ jobs:
           rm -rf weights
           .build/release/mlxfast-swift transform --reference "${MLXFAST_REFERENCE_DIR}" --output weights
           [[ -f weights/config.json ]] || { echo "::error::the transform wrote no weights/config.json" >&2; exit 1; }
-          echo "transformed tree: $(ls weights | wc -l | tr -d ' ') files; digest $("${BENCHD_BIN_DIR}/benchd" weights-digest --weights weights 2>/dev/null || echo unavailable)"
+          echo "transformed tree: $(find weights -mindepth 1 -maxdepth 1 | wc -l | tr -d ' ') files; digest $("${BENCHD_BIN_DIR}/benchd" weights-digest --weights weights 2>/dev/null || echo unavailable)"
 
       - name: Record the dispatched candidate sha (author-at-seal)
         # FROM THE BOX (2026-08-26 evidence run). benchd's official seal

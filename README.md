@@ -464,7 +464,9 @@ job, over the ONE prompt the fixture names in `live_golden`:
 
 1. The **serial-control leg**. It runs on the organizer's reference tree. That
    tree is a build of this repository at the commit the fixture names in
-   `baseline_reference_commit`. This leg uses no speculation.
+   `baseline_reference_commit`. This leg uses no speculation. Its tokens are
+   checked against the serial tape (`<live_golden>.golden.json`), never against
+   a per-depth tape.
 2. The **candidate leg**. It runs on your tree, at the draft depth you declare.
 
 The score is the ratio of the two measurements. Both numbers come from the same
