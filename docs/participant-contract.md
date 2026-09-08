@@ -371,7 +371,9 @@ the ONE prompt the fixture names in `live_golden`:
 1. The **serial-control leg**. It runs on the organizer's reference tree, which
    `MLXFAST_BASELINE_WORKSPACE` names. That tree is a build of this repository
    at the commit the fixture names in `baseline_reference_commit`. The leg uses
-   no speculation.
+   no speculation. The measure script passes the serial tape to benchd as
+   `--control-golden`, so this leg is verified against the serial tape and the
+   candidate leg against the tape recorded at its declared depth.
 2. The **candidate leg**. It runs on the submission tree, at its declared draft
    depth.
 
