@@ -85,7 +85,17 @@ SWIFT_BIN="${MLXFAST_SWIFT_BIN:-.build/release/mlxfast-swift}"
 # (.build-worker) so a participant-code build never writes into the trusted
 # CLI's build tree (.build). mlx.metallib is a participant artifact and lives
 # next to the worker binary, where Cmlx searches first.
-BENCH_WORKER_BIN="${MLXFAST_BENCH_WORKER_EXECUTABLE:-.build-worker/release/bench-worker}"
+# The product is `track-bench-worker`, not `bench-worker`: the pinned fork
+# declares an executable product of the latter name, and SwiftPM does not
+# prefer this package's over a dependency's -- `swift build --product
+# bench-worker` silently builds the FORK's, which carries no Runner/ (see
+# Package.swift). The FILE benchd resolves is unchanged: tools/stage-bench-
+# worker.sh still copies whatever this names to .build/release/bench-worker.
+BENCH_WORKER_BIN="${MLXFAST_BENCH_WORKER_EXECUTABLE:-.build-worker/release/track-bench-worker}"
+# EXPORTED so the two tools that resolve the same pair -- tools/build-mlx-
+# metallib.sh and tools/stage-bench-worker.sh -- see this value rather than
+# their own `bench-worker` default. Both are unchanged.
+export MLXFAST_BENCH_WORKER_EXECUTABLE="${BENCH_WORKER_BIN}"
 MLX_METALLIB="${MLXFAST_MLX_METALLIB:-$(dirname "${BENCH_WORKER_BIN}")/mlx.metallib}"
 DEFAULT_REFERENCE_DIR="reference_weights/Qwen3.8-Flash-Next-MLX-4bit-MTP"
 DEFAULT_HF_HOME="${MLXFAST_HF_HOME:-${HF_HOME:-${HOME:-${PWD}}/.cache/huggingface}}"
@@ -207,8 +217,9 @@ Important environment variables:
                                      as a deprecated alias.
   MLXFAST_SWIFT_BIN                  Trusted user-facing Swift CLI.
                                      Default: ${SWIFT_BIN}
-  MLXFAST_BENCH_WORKER_EXECUTABLE    Scored engine executable (the fork's
-                                     generic bench-worker).
+  MLXFAST_BENCH_WORKER_EXECUTABLE    Scored engine executable (this
+                                     repository's bench-worker shim over the
+                                     editable Runner/).
                                      Default: ${BENCH_WORKER_BIN}
   MLXFAST_SKIP_WEIGHTS_DOWNLOAD=1    Build tools only; do not download weights.
   MLXFAST_SKIP_SWIFT_BUILD=1         Reuse the Swift products from a previous
@@ -2965,7 +2976,7 @@ build_swift_harness() {
   CLANG_MODULE_CACHE_PATH="${CLANG_MODULE_CACHE_PATH:-${PWD}/.build/clang-module-cache}" \
     swift build -c release --force-resolved-versions --product mlxfast-swift
   CLANG_MODULE_CACHE_PATH="${CLANG_MODULE_CACHE_PATH:-${PWD}/.build-worker/clang-module-cache}" \
-    swift build -c release --force-resolved-versions --scratch-path .build-worker --product bench-worker
+    swift build -c release --force-resolved-versions --scratch-path .build-worker --product track-bench-worker
   if [[ ! -x "${SWIFT_BIN}" ]]; then
     echo "${SETUP_LOG_LABEL}: trusted Swift CLI missing at ${SWIFT_BIN}; build failed or MLXFAST_SWIFT_BIN is wrong" >&2
     return 1

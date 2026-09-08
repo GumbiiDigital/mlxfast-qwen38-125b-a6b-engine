@@ -173,7 +173,7 @@ git_target -c protocol.file.allow=always \
 #    scratch root (.build-worker), so a participant-code compile can never write
 #    into the trusted CLI's .build tree. These are setup.sh's own two lines.
 run env -C "${TARGET}" swift build -c release --force-resolved-versions --product mlxfast-swift
-run env -C "${TARGET}" swift build -c release --force-resolved-versions --scratch-path .build-worker --product bench-worker
+run env -C "${TARGET}" swift build -c release --force-resolved-versions --scratch-path .build-worker --product track-bench-worker
 
 # 4. The Metal library, published next to the worker where Cmlx searches for it.
 if [[ "${PRESTAGED_METALLIB}" == "1" ]]; then
@@ -202,7 +202,7 @@ fi
 
 # 5. Stage the finished set into .build/release, the FIXED path benchd resolves
 #    the engine at, with the metallib and its fingerprint sidecar as siblings.
-run env -C "${TARGET}" tools/stage-bench-worker.sh
+run env -C "${TARGET}" MLXFAST_BENCH_WORKER_EXECUTABLE=.build-worker/release/track-bench-worker tools/stage-bench-worker.sh
 
 # 6. The reference tree's OWN transformed weights, from the box's verified
 #    checkpoint. This is the ranked job's own transform line, run here.
