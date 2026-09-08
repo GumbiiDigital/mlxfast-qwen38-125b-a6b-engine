@@ -1,0 +1,607 @@
+{
+  "canonicalization": "Sort by tensor name; encode each [name, shard_index] as compact UTF-8 JSON followed by LF. shard_index is the 1-based position of the shard file in the sorted shard list.",
+  "mtp_tensors": [
+    [
+      "language_model.mtp.fc_embedding.biases",
+      22
+    ],
+    [
+      "language_model.mtp.fc_embedding.scales",
+      22
+    ],
+    [
+      "language_model.mtp.fc_embedding.weight",
+      22
+    ],
+    [
+      "language_model.mtp.fc_hidden.biases",
+      22
+    ],
+    [
+      "language_model.mtp.fc_hidden.scales",
+      22
+    ],
+    [
+      "language_model.mtp.fc_hidden.weight",
+      22
+    ],
+    [
+      "language_model.mtp.hyper_connection_mixer.hc_norm.weight",
+      22
+    ],
+    [
+      "language_model.mtp.hyper_connection_mixer.input_mix_weight_down.biases",
+      22
+    ],
+    [
+      "language_model.mtp.hyper_connection_mixer.input_mix_weight_down.scales",
+      22
+    ],
+    [
+      "language_model.mtp.hyper_connection_mixer.input_mix_weight_down.weight",
+      22
+    ],
+    [
+      "language_model.mtp.hyper_connection_mixer.input_mix_weight_up.biases",
+      22
+    ],
+    [
+      "language_model.mtp.hyper_connection_mixer.input_mix_weight_up.scales",
+      22
+    ],
+    [
+      "language_model.mtp.hyper_connection_mixer.input_mix_weight_up.weight",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.attn_hyper_connection.block_inject_weight.biases",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.attn_hyper_connection.block_inject_weight.scales",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.attn_hyper_connection.block_inject_weight.weight",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.attn_hyper_connection.hc_norm.weight",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.attn_hyper_connection.input_mix_weight_down.biases",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.attn_hyper_connection.input_mix_weight_down.scales",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.attn_hyper_connection.input_mix_weight_down.weight",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.attn_hyper_connection.input_mix_weight_up.biases",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.attn_hyper_connection.input_mix_weight_up.scales",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.attn_hyper_connection.input_mix_weight_up.weight",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.mlp.gate.weight",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.mlp.shared_expert.down_proj.biases",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.mlp.shared_expert.down_proj.scales",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.mlp.shared_expert.down_proj.weight",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.mlp.shared_expert.gate_proj.biases",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.mlp.shared_expert.gate_proj.scales",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.mlp.shared_expert.gate_proj.weight",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.mlp.shared_expert.up_proj.biases",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.mlp.shared_expert.up_proj.scales",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.mlp.shared_expert.up_proj.weight",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.mlp.shared_expert_gate.biases",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.mlp.shared_expert_gate.scales",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.mlp.shared_expert_gate.weight",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.mlp.switch_mlp.down_proj.biases",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.mlp.switch_mlp.down_proj.scales",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.mlp.switch_mlp.down_proj.weight",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.mlp.switch_mlp.gate_proj.biases",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.mlp.switch_mlp.gate_proj.scales",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.mlp.switch_mlp.gate_proj.weight",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.mlp.switch_mlp.up_proj.biases",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.mlp.switch_mlp.up_proj.scales",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.mlp.switch_mlp.up_proj.weight",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.mlp_hyper_connection.block_inject_weight.biases",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.mlp_hyper_connection.block_inject_weight.scales",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.mlp_hyper_connection.block_inject_weight.weight",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.mlp_hyper_connection.hc_norm.weight",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.mlp_hyper_connection.input_mix_weight_down.biases",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.mlp_hyper_connection.input_mix_weight_down.scales",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.mlp_hyper_connection.input_mix_weight_down.weight",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.mlp_hyper_connection.input_mix_weight_up.biases",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.mlp_hyper_connection.input_mix_weight_up.scales",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.mlp_hyper_connection.input_mix_weight_up.weight",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.self_attn.indexer.index_qk_proj.biases",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.self_attn.indexer.index_qk_proj.scales",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.self_attn.indexer.index_qk_proj.weight",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.self_attn.indexer.k_layernorm.weight",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.self_attn.indexer.q_layernorm.weight",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.self_attn.k_norm.weight",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.self_attn.k_proj.biases",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.self_attn.k_proj.scales",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.self_attn.k_proj.weight",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.self_attn.o_proj.biases",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.self_attn.o_proj.scales",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.self_attn.o_proj.weight",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.self_attn.q_norm.weight",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.self_attn.q_proj.biases",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.self_attn.q_proj.scales",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.self_attn.q_proj.weight",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.self_attn.v_proj.biases",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.self_attn.v_proj.scales",
+      22
+    ],
+    [
+      "language_model.mtp.layers.0.self_attn.v_proj.weight",
+      22
+    ],
+    [
+      "language_model.mtp.pre_fc_norm_embedding.weight",
+      22
+    ],
+    [
+      "language_model.mtp.pre_fc_norm_hidden.weight",
+      22
+    ]
+  ],
+  "ngram_shard_layout": {
+    "checkpoint_shards": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "components_per_part": 3,
+    "layer_indices": [
+      1
+    ],
+    "module_path_pattern": "language_model.model.layers.{i}.ple.ple_embedding.ngram_embedding.shard_{j}.{weight,scales,biases}",
+    "shard_part_count": 128
+  },
+  "schema_version": 1,
+  "shard_headers": [
+    {
+      "header_bytes": 54111,
+      "header_sha256": "30d077c917fdf3943a7eb2b25d2f1503c7bf391c41e91dd83eb804fd43047147",
+      "index": 1,
+      "name": "model-00001-of-00022.safetensors"
+    },
+    {
+      "header_bytes": 9929,
+      "header_sha256": "1adb24a4c2fcc3d97cd7c92a1145e450c047d8197c9ddc45b936a8af789f02b9",
+      "index": 2,
+      "name": "model-00002-of-00022.safetensors"
+    },
+    {
+      "header_bytes": 9946,
+      "header_sha256": "ade5224a58540154fc7215d4c3a4458604bd2baaf540126c5152009bc3867575",
+      "index": 3,
+      "name": "model-00003-of-00022.safetensors"
+    },
+    {
+      "header_bytes": 9952,
+      "header_sha256": "4a8ee1990f05afd878b3f9edcf4e21bfd97942ca51bb006248191ae29c4ebc9c",
+      "index": 4,
+      "name": "model-00004-of-00022.safetensors"
+    },
+    {
+      "header_bytes": 9956,
+      "header_sha256": "b6e41286b5ae8667ec653144186d8538dbdcce659e59233a355246e45f014d70",
+      "index": 5,
+      "name": "model-00005-of-00022.safetensors"
+    },
+    {
+      "header_bytes": 9976,
+      "header_sha256": "b2d4e46a82a7c1b77726f2519bfc03662e6aa7739aee2b30ff7f35d91535b97d",
+      "index": 6,
+      "name": "model-00006-of-00022.safetensors"
+    },
+    {
+      "header_bytes": 16404,
+      "header_sha256": "bf204e8e7ab220b6fbf4d46a4cf2f147cf9fa02473f20e1b3718a0472d4dc792",
+      "index": 7,
+      "name": "model-00007-of-00022.safetensors"
+    },
+    {
+      "header_bytes": 26138,
+      "header_sha256": "89f4e61dfd10c99d3fa05e505ff60e1ca2b892e11bcbb9e7cc1bde0f30ac32c5",
+      "index": 8,
+      "name": "model-00008-of-00022.safetensors"
+    },
+    {
+      "header_bytes": 26078,
+      "header_sha256": "4ac470f055e9d538cb86a3b67640e2e9cbf7303f8ad7d72ad8f3b0faebb97025",
+      "index": 9,
+      "name": "model-00009-of-00022.safetensors"
+    },
+    {
+      "header_bytes": 26223,
+      "header_sha256": "3f13ca97e2b1381defe879e050e031900da558c6f50d3d4e1640b97b72e738dc",
+      "index": 10,
+      "name": "model-00010-of-00022.safetensors"
+    },
+    {
+      "header_bytes": 26370,
+      "header_sha256": "9e15f342104d6174b8b1481eba83685018e9ac575b489403697723bdd668f286",
+      "index": 11,
+      "name": "model-00011-of-00022.safetensors"
+    },
+    {
+      "header_bytes": 33493,
+      "header_sha256": "02bd70c9d75d3b00da7785db048c420687f74ebf426067e1a21494c97698e613",
+      "index": 12,
+      "name": "model-00012-of-00022.safetensors"
+    },
+    {
+      "header_bytes": 26171,
+      "header_sha256": "3a0f84c6973a8575dc18bb0a907a62bbbc38689fb920638b4a9af86e5a38d82a",
+      "index": 13,
+      "name": "model-00013-of-00022.safetensors"
+    },
+    {
+      "header_bytes": 26319,
+      "header_sha256": "2895a04251dda964852ade0b658974ee4f8e54088ad969e7cc4fcfd281f31f17",
+      "index": 14,
+      "name": "model-00014-of-00022.safetensors"
+    },
+    {
+      "header_bytes": 26315,
+      "header_sha256": "07f859034b1a72e0379b561ebe866889dbbff680fd2271fa0cee52cee8dafc7e",
+      "index": 15,
+      "name": "model-00015-of-00022.safetensors"
+    },
+    {
+      "header_bytes": 26328,
+      "header_sha256": "84485b2bc6e9518bb37b32a7a915ab8a132c7eaeb906b1cab760dee5e2a1c812",
+      "index": 16,
+      "name": "model-00016-of-00022.safetensors"
+    },
+    {
+      "header_bytes": 33433,
+      "header_sha256": "6969048bc6346f735f20f1ed48f7b629d33ca1498173db3aaa39e7a398a0fba8",
+      "index": 17,
+      "name": "model-00017-of-00022.safetensors"
+    },
+    {
+      "header_bytes": 26215,
+      "header_sha256": "7991cccbc5110688d564b3c5572853218555015b7108c4b178c6f32317b7b480",
+      "index": 18,
+      "name": "model-00018-of-00022.safetensors"
+    },
+    {
+      "header_bytes": 26321,
+      "header_sha256": "f36b2c053ea91f944f8cbe60be9d6277897b82b68a075070fca234c466ea6674",
+      "index": 19,
+      "name": "model-00019-of-00022.safetensors"
+    },
+    {
+      "header_bytes": 26255,
+      "header_sha256": "762d0d98e9d6003ac8eb764545841bbea18b9afc83255de537147706c07efad0",
+      "index": 20,
+      "name": "model-00020-of-00022.safetensors"
+    },
+    {
+      "header_bytes": 26324,
+      "header_sha256": "e29cafe5027de18ccb9f4fae2f54f2e21a568cec389d1fd925e659669e3f456b",
+      "index": 21,
+      "name": "model-00021-of-00022.safetensors"
+    },
+    {
+      "header_bytes": 25174,
+      "header_sha256": "64bb40bbf368873f00a66b4f74603df8d110826e63a6527c492a0df01f869665",
+      "index": 22,
+      "name": "model-00022-of-00022.safetensors"
+    }
+  ],
+  "shards": [
+    {
+      "index": 1,
+      "name": "model-00001-of-00022.safetensors",
+      "tensor_count": 450
+    },
+    {
+      "index": 2,
+      "name": "model-00002-of-00022.safetensors",
+      "tensor_count": 63
+    },
+    {
+      "index": 3,
+      "name": "model-00003-of-00022.safetensors",
+      "tensor_count": 63
+    },
+    {
+      "index": 4,
+      "name": "model-00004-of-00022.safetensors",
+      "tensor_count": 63
+    },
+    {
+      "index": 5,
+      "name": "model-00005-of-00022.safetensors",
+      "tensor_count": 63
+    },
+    {
+      "index": 6,
+      "name": "model-00006-of-00022.safetensors",
+      "tensor_count": 63
+    },
+    {
+      "index": 7,
+      "name": "model-00007-of-00022.safetensors",
+      "tensor_count": 110
+    },
+    {
+      "index": 8,
+      "name": "model-00008-of-00022.safetensors",
+      "tensor_count": 185
+    },
+    {
+      "index": 9,
+      "name": "model-00009-of-00022.safetensors",
+      "tensor_count": 185
+    },
+    {
+      "index": 10,
+      "name": "model-00010-of-00022.safetensors",
+      "tensor_count": 185
+    },
+    {
+      "index": 11,
+      "name": "model-00011-of-00022.safetensors",
+      "tensor_count": 185
+    },
+    {
+      "index": 12,
+      "name": "model-00012-of-00022.safetensors",
+      "tensor_count": 236
+    },
+    {
+      "index": 13,
+      "name": "model-00013-of-00022.safetensors",
+      "tensor_count": 185
+    },
+    {
+      "index": 14,
+      "name": "model-00014-of-00022.safetensors",
+      "tensor_count": 185
+    },
+    {
+      "index": 15,
+      "name": "model-00015-of-00022.safetensors",
+      "tensor_count": 185
+    },
+    {
+      "index": 16,
+      "name": "model-00016-of-00022.safetensors",
+      "tensor_count": 185
+    },
+    {
+      "index": 17,
+      "name": "model-00017-of-00022.safetensors",
+      "tensor_count": 236
+    },
+    {
+      "index": 18,
+      "name": "model-00018-of-00022.safetensors",
+      "tensor_count": 185
+    },
+    {
+      "index": 19,
+      "name": "model-00019-of-00022.safetensors",
+      "tensor_count": 185
+    },
+    {
+      "index": 20,
+      "name": "model-00020-of-00022.safetensors",
+      "tensor_count": 185
+    },
+    {
+      "index": 21,
+      "name": "model-00021-of-00022.safetensors",
+      "tensor_count": 185
+    },
+    {
+      "index": 22,
+      "name": "model-00022-of-00022.safetensors",
+      "tensor_count": 180
+    }
+  ],
+  "source": {
+    "config_bytes": 5361,
+    "config_sha256": "4efd5f41c47e8de9f55c678df4a237cbbc78e4d517dad42a906889f7d94f79a2",
+    "index_bytes": 420813,
+    "index_sha256": "8848503860c7da8619fdc8d5e65201868f8f1d21d69d2e21166c95522379ff77",
+    "index_total_size": 113209155128,
+    "repository": "Vontra/Qwen3.8-Flash-Next-MLX-4bit-MTP",
+    "revision": "327c8a604de613b42f84ba5e6b796c0931e8aa3b"
+  },
+  "summary": {
+    "canonical_sha256": "c3f2e691572d973d91acb47b148fdc52d3532df4968b13830408ee1a3018d39b",
+    "dtype_counts": {
+      "BF16": 2724,
+      "I64": 3,
+      "U32": 1020
+    },
+    "mtp_tensor_count": 76,
+    "ngram_shard_tensor_count": 384,
+    "prefix_tensor_counts": {
+      "language_model.lm_head": 3,
+      "language_model.model": 3335,
+      "language_model.mtp": 76,
+      "vision_tower": 333
+    },
+    "shard_count": 22,
+    "tensor_count": 3747,
+    "tensor_shapes": {
+      "canonical_sha256": "0e6c55e40fd8393e5247a1de6db571efd97f767ebe8da96da9934697c05a97d5",
+      "canonicalization": "Sort by tensor name; encode each [name, dtype, shape] as compact UTF-8 JSON followed by LF. dtype and shape are the safetensors header values, unchanged.",
+      "tensor_count": 3747
+    },
+    "text_tower_tensor_count": 3414,
+    "vision_tower_tensor_count": 333
+  }
+}
