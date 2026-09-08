@@ -1943,19 +1943,19 @@ done
 
 # The count moves DELIBERATELY. A second entry riding along would pass every
 # check above and this one is what refuses it.
-assert_equal "head-surface/editablePaths holds exactly 70 entries" \
+assert_equal "head-surface/editablePaths holds exactly 71 entries" \
   "$(python3 -c 'import json,sys; print(len(json.load(open(sys.argv[1]))["editablePaths"]))' \
       "${REPO_ROOT}/benchmark.json")" \
-  "70"
+  "71"
 
 # The count is stated in four places. A half-updated ripple is the defect class
 # a reviewer catches, so the three prose sites are held to the manifest.
 for count_site in README.md TASK.md docs/participant-contract.md; do
-  assert_equal "head-surface/${count_site} states the same 70 entries" \
-    "$(grep -c 'lists 70 entries' "${REPO_ROOT}/${count_site}")" "1"
+  assert_equal "head-surface/${count_site} states the same 71 entries" \
+    "$(grep -c 'lists 71 entries' "${REPO_ROOT}/${count_site}")" "1"
 done
-assert_equal "head-surface/the Swift count pin states 70" \
-  "$(grep -c 'editablePaths.count == 70' "${REPO_ROOT}/Tests/MLXFastTests/Gemma4BenchmarkManifestTests.swift")" \
+assert_equal "head-surface/the Swift count pin states 71" \
+  "$(grep -c 'editablePaths.count == 71' "${REPO_ROOT}/Tests/MLXFastTests/Gemma4BenchmarkManifestTests.swift")" \
   "1"
 
 # --- J. the docs may not describe a DISK re-quantization -------------------

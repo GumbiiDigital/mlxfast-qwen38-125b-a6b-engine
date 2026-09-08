@@ -24,7 +24,7 @@ head ships inside the pinned target checkpoint under `language_model.mtp.*`.
 
 ## What you may change
 
-`benchmark.json` `editablePaths` is the authority. It lists 70 entries in three
+`benchmark.json` `editablePaths` is the authority. It lists 71 entries in four
 groups.
 
 | Group | Paths |

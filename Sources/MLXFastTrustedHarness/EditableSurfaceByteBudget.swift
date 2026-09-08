@@ -79,7 +79,19 @@ public enum EditableSurfaceByteBudget {
     /// 1 MiB of margin still fits a handful of near-term merged edits at the
     /// per-submission growth cap before this budget needs raising again, while
     /// keeping the cap tight enough to bind fail-closed.
-    public static let defaultMaxTotalBytes = 2_706_783
+    /// RE-DERIVED 2026-09-08, when the Runner became an editable path.
+    /// `Runner/Qwen4ExpRunner.swift` -- the copy of the fork's runner this
+    /// repository now owns -- adds 16,260 B to the enforced surface, and the
+    /// cap moves by that plus the stated 1 MiB margin:
+    ///
+    ///     2,706,783 (old cap) + 16,260 (added) + 1,048,576 (margin) = 3,771,619
+    ///
+    /// This raise also clears a margin that was ALREADY under the stated
+    /// minimum before the Runner arrived: the at-rest surface had reached
+    /// 1,730,491 B against the 2,706,783 B cap, i.e. 976,292 B of margin,
+    /// 72,284 B below 1 MiB, so `enforcedSurfaceStaysUnderTotalCap` was red on
+    /// main. At the new cap the 1,746,751 B surface leaves 2,024,868 B.
+    public static let defaultMaxTotalBytes = 3_771_619
     public static let defaultMaxFileBytes = 524_288
     /// Bound on the bytes a submission may ADD to the editable surface versus
     /// its review base. Not consumed by the launch-time walk (there is no base

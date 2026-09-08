@@ -72,7 +72,7 @@ it cannot honour the pinned backend. It does not degrade to another backend.
 
 ## 3. What you may edit
 
-`benchmark.json` `editablePaths` is the authority. It lists 70 entries.
+`benchmark.json` `editablePaths` is the authority. It lists 71 entries.
 
 The rule behind the list: anything that only **proposes** tokens or computes
 the forward pass is editable. Anything that **verifies**, **measures**, or
@@ -112,7 +112,7 @@ contract, never from the submission.
 
 | Key | Value |
 |---|---|
-| `maxTotalBytes` | 2706783 |
+| `maxTotalBytes` | 3771619 |
 | `maxFileBytes` | 524288 |
 | `maxGrowthBytes` | 262144 |
 | `exemptPathMaxBytes` | 512000000 |

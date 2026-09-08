@@ -97,7 +97,7 @@ struct Gemma4BenchmarkManifestTests {
         // the head, which on this track is the head EMBEDDED in the pinned
         // checkpoint. The head WEIGHTS directories are gone entirely -- this
         // track stages no head file at all.
-        #expect(editablePaths.count == 70, "editablePaths count drifted; update this pin deliberately if the surface changed")
+        #expect(editablePaths.count == 71, "editablePaths count drifted; update this pin deliberately if the surface changed")
 
         let fm = FileManager.default
         for path in editablePaths {
@@ -235,7 +235,16 @@ struct Gemma4BenchmarkManifestTests {
         // companion to public PR #53, which applied the same +5 MiB raise on the
         // same tripwire. This literal MIRRORS the enforcer default, so it moves
         // with it; the 1 MiB minimum-margin assertion below is unchanged.
-        #expect(budget["maxTotalBytes"] as? Int == 2_706_783)
+        //
+        // Raised again 2026-09-08 (2,706,783 -> 3,771,619) when `Runner/`
+        // joined the editable surface: the Runner is the model family's code,
+        // and a participant on this track could not edit it while it lived
+        // inside the pinned fork submodule. The copy adds 16,260 B, and the cap
+        // moves by that plus the stated 1 MiB margin. The old cap was ALREADY
+        // 72,284 B under the minimum margin before the Runner arrived, which is
+        // the condition `enforcedSurfaceStaysUnderTotalCap` below exists to
+        // report; this raise clears both.
+        #expect(budget["maxTotalBytes"] as? Int == 3_771_619)
         #expect(budget["maxFileBytes"] as? Int == 524_288)
         #expect(budget["maxGrowthBytes"] as? Int == 262_144)
 

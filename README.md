@@ -249,7 +249,7 @@ stages none.
 
 ## What you may change
 
-`benchmark.json` `editablePaths` is the authority. It lists 70 entries. The
+`benchmark.json` `editablePaths` is the authority. It lists 71 entries. The
 rule behind the list is simple. Code that **proposes** tokens or computes the
 forward pass is editable. Code that **verifies**, **measures**, or **ledgers**
 stays trusted.
@@ -338,7 +338,7 @@ surface.
 
 | Key | Value |
 |---|---|
-| `maxTotalBytes` | 2706783 |
+| `maxTotalBytes` | 3771619 |
 | `maxFileBytes` | 524288 |
 | `maxGrowthBytes` | 262144 |
 | `exemptPathMaxBytes` | 512000000 |
