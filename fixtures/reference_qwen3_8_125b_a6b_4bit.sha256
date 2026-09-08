@@ -1,0 +1,59 @@
+# SHA256 manifest for Vontra/Qwen3.8-Flash-Next-MLX-4bit-MTP.
+# Revision: 327c8a604de613b42f84ba5e6b796c0931e8aa3b
+#
+# The Qwen 3.8 125B A6B target for track qwen3.8-125b-a6b-mlx-v1. Public
+# repository, anonymous fetch. This manifest is what setup.sh's
+# MLXFAST_REFERENCE_MANIFEST_PATH points at, replacing
+# fixtures/reference_qwen3_8_125b_a6b_4bit.sha256.
+#
+# No organizer-hosted mirror exists for this checkpoint, so
+# REFERENCE_FALLBACK_BASE_URL stays empty, as it did for the Gemma manifest.
+#
+# Verified against the pinned revision's published tree via the Hugging Face
+# tree API. LFS-backed entries (the 22 safetensors shards and tokenizer.json)
+# use the LFS object's own sha256 (`lfs.oid`); the rest were fetched and
+# hashed directly. The published tree also carries `.gitattributes` (1570
+# bytes), `LICENSE` (3235 bytes) and `qwen-logo.png` (11203 bytes),
+# DELIBERATELY NOT pinned here -- none is engine-loaded, following the
+# load-bearing-only convention of the manifests this one replaces.
+#
+# This is the RAW DOWNLOAD manifest. It covers the whole published tree,
+# vision tower bytes included inside the safetensors shards; the engine loads
+# the text tower only.
+#
+#   MLXFAST_REFERENCE_MANIFEST_RECORDS: 32
+#   MLXFAST_REFERENCE_MANIFEST_BYTES:   113233030116
+#
+# Format: <sha256> <byte_count> <relative_path>
+bbaff449aac387c358a3255389d6e12799f25ecb1289b1377664f3f68c0ffef9 8397 README.md
+c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041 8952 chat_template.jinja
+4efd5f41c47e8de9f55c678df4a237cbbc78e4d517dad42a906889f7d94f79a2 5361 config.json
+e70c136c1b78ddc1fb0905bac8e733a4dc448d4f852a5dd75143fffc70be550e 202 generation_config.json
+a9d356d7bdf1ef4949e3e748e95b8e10ad9d4e2e838eddc38a0a7b6b94d1db8d 3353259 merges.txt
+308f20b7e35a3e525f36eca0df286f6d1043cfeb621e7bbcf372a834c99cd66d 5283195887 model-00001-of-00022.safetensors
+8af1a616f2f39dbfe6ee92e959afb2414623fcb299aff1ced55984bfe810d608 5250035137 model-00002-of-00022.safetensors
+519a0472252ac9a51af020686f462aa6be82ce655f948fd5f054d70949de17a6 5250035154 model-00003-of-00022.safetensors
+b1ad7e951969eb8dc4e92762dc2e50bd47353c95990ae207db5da393d441400f 5250035160 model-00004-of-00022.safetensors
+9ca797304c563bb65f2356b67d444511b11744bc5b5c8ec8345ae7d97d3e251c 5250035164 model-00005-of-00022.safetensors
+8aab4c1dce7d8a0af645426b66d1caf30245d422d4c6b7029583959d675a1827 5250035184 model-00006-of-00022.safetensors
+7908da37b2e3fa7f0de8b9734dad0759be7dc445716f3acd59c20c4842638db9 5067850140 model-00007-of-00022.safetensors
+85beff20f250bfe63e95f12c0460512aab92bcde8f7408fe9c20e3de0321bc1d 5337131618 model-00008-of-00022.safetensors
+f7c03ae640e9bf0f7813ef2b2980afa83a883c02b3988e814e9921055fc08a28 5337131558 model-00009-of-00022.safetensors
+6897f52227533e720b243d6aef24c1293ad1eb02a1bb2ec6a6e4dc48d56d0c8f 4970130103 model-00010-of-00022.safetensors
+905d27f9db887284289a043f9638020258c5f90d52122cdce2e7aef941a431f2 5341257482 model-00011-of-00022.safetensors
+c4d2bb76fa4613f7386ddaa7045608c320f9736623211a814aa28fb370530dec 4967968541 model-00012-of-00022.safetensors
+1f20a5e1f2256b2fb6a78fef52f9e66daa970f4318ab1be3abb32a1effedbbf3 5337131651 model-00013-of-00022.safetensors
+860d12691792df5f08c9dfe245dc356773741f1edcc1fd430672ef06ac387635 5337131799 model-00014-of-00022.safetensors
+259fb7577b8248f6dcbe6a932fe5d2f1c8869eda761ef3394fe6ad06065f216c 4970130195 model-00015-of-00022.safetensors
+e931785f9ff4e0a567bf8c06df37639be46b4dae156e0f8b39b9d32a03d75792 5341257440 model-00016-of-00022.safetensors
+4f4610dc4a862bf9d93d70cfd0ec037e8e7943a734794d34eb5c0d748b74747a 4967968481 model-00017-of-00022.safetensors
+afdb4828920186600f9d61537d1465979fb36692f4eddb8c5a961a6b72964b77 5337131695 model-00018-of-00022.safetensors
+869d34c6e8f7db79bd4e54b9833d5b0db45eefac860c9bd64fbd312bf862a667 5337131801 model-00019-of-00022.safetensors
+5ca2f994fec1aa06fefef6646b9f072cf70f7f73aa8dab4c7c1a9a424afb4a52 4970130135 model-00020-of-00022.safetensors
+58def6762f29cc798437e5649a56ee75d053faca69138a2454dbdb34bb8a37c3 5341257436 model-00021-of-00022.safetensors
+30a3c82b573d813a1d2349f1c05c308c0d415f3ca1bb67caa0bfaad8a6afa7a3 3715570974 model-00022-of-00022.safetensors
+8848503860c7da8619fdc8d5e65201868f8f1d21d69d2e21166c95522379ff77 420813 model.safetensors.index.json
+27225450ac9c6529872ee1924fcb0962ff5634834f817040f444118116f4e516 390 preprocessor_config.json
+0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3 12809320 tokenizer.json
+b11349aafa7cdc6a320767cf7ceb29ed82f7eda5d65e8e0819e76f0ce947bf27 17928 tokenizer_config.json
+ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003 6722759 vocab.json
