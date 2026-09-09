@@ -475,14 +475,14 @@ jobs:
             # Stage once more without the knob: the pair beside the scored
             # engine is copied next to the staged binary.
             tools/stage-bench-worker.sh
-          elif [[ "${{ inputs.prestaged_metallib }}" == "true" ]]; then
+          elif [[ "${{ inputs.prestaged_metallib }}" == "true" ]] \
+            && [[ "$(awk '/^mlxfast-metallib-fingerprint-v1 /{print $2}' "${MLXFAST_METALLIB_STAGE}/mlx.metallib.fingerprint")" == "$(tools/build-mlx-metallib.sh --print-fingerprint)" ]]; then
+            # The pre-staged library is adopted ONLY when its fingerprint is this
+            # checkout's vendored-source fingerprint. A submission that edits a
+            # vendored kernel (an editable path) changes the fingerprint, and then
+            # the library is built from this checkout below, never refused.
             stage="${MLXFAST_METALLIB_STAGE}"
             want="$(tools/build-mlx-metallib.sh --print-fingerprint)"
-            have="$(awk '/^mlxfast-metallib-fingerprint-v1 /{print $2}' "${stage}/mlx.metallib.fingerprint")"
-            if [[ -z "${have}" || "${have}" != "${want}" ]]; then
-              echo "::error::the pre-staged mlx.metallib.fingerprint (${have:-none}) is not this checkout's vendored-source fingerprint (${want}); rebuild the library from this tree" >&2
-              exit 1
-            fi
             echo "pre-staged mlx.metallib adopted: fingerprint ${want} verified against the vendored tree"
             # setup.sh reads the pair from the stage itself. It is copied into the
             # scratch directory only AFTER the build: on a fresh scratch path
@@ -497,6 +497,9 @@ jobs:
             # skip knob so the staged worker gets its metallib sibling.
             tools/stage-bench-worker.sh
           else
+            if [[ "${{ inputs.prestaged_metallib }}" == "true" ]]; then
+              echo "the pre-staged mlx.metallib fingerprint is not this checkout's vendored-source fingerprint ($(tools/build-mlx-metallib.sh --print-fingerprint)): the candidate edited a vendored kernel, so the library is built from this checkout"
+            fi
             ./setup.sh
           fi
 
