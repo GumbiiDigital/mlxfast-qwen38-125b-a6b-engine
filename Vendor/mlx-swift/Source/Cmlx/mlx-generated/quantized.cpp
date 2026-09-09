@@ -124,6 +124,12 @@ inline U load_vector_safe(const device T* x, thread U* x_thread, int N) {
           bits == 8,
       "Template undefined for bits not in {2, 3, 4, 5, 6, 8}");
 
+  if constexpr (bits == 4) {
+    if (N == values_per_thread) {
+      return load_vector<T, U, values_per_thread, bits>(x, x_thread);
+    }
+  }
+
   U sum = 0;
 
   if (bits == 2) {
@@ -314,6 +320,12 @@ inline U qdot_safe(
       bits == 2 || bits == 3 || bits == 4 || bits == 5 || bits == 6 ||
           bits == 8,
       "Template undefined for bits not in {2, 3, 4, 5, 6, 8}");
+
+  if constexpr (bits == 4) {
+    if (N == values_per_thread) {
+      return qdot<U, values_per_thread, bits>(w, x_thread, scale, bias, sum);
+    }
+  }
 
   U accum = 0;
 
