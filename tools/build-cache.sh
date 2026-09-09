@@ -26,7 +26,7 @@ log() { printf 'build-cache.sh: %s\n' "$*"; }
 die() { printf 'build-cache.sh: %s\n' "$*" >&2; exit 2; }
 CACHE_ROOT="${MLXFAST_BUILD_CACHE_DIR:-${HOME}/.cache/mlxfast-engine-build}"
 ARTEFACTS=(
-  ".build-worker/release/bench-worker"
+  ".build-worker/release/track-bench-worker"
   ".build-worker/release/mlx.metallib"
   ".build-worker/release/mlx.metallib.fingerprint"
   ".build/release/mlxfast-swift"
@@ -35,7 +35,7 @@ sha256_of_file() { shasum -a 256 -- "$1" | cut -d ' ' -f 1; }
 sha256_of_stdin() { shasum -a 256 | cut -d ' ' -f 1; }
 content_key() {
   local paths gitlink dirty
-  paths=('Sources/*' 'Vendor/mlx-swift/*' 'Package.swift' 'Package.resolved' 'tools/build-mlx-metallib.sh' 'tools/stage-bench-worker.sh')
+  paths=('Runner/*' 'Plugins/*' 'tools/stamp-bench-revision.sh' 'tools/build-cache.sh' 'Sources/*' 'Vendor/mlx-swift/*' 'Package.swift' 'Package.resolved' 'tools/build-mlx-metallib.sh' 'tools/stage-bench-worker.sh')
   gitlink="$(git ls-tree HEAD Vendor/mlx-swift-lm | awk '{print $3}')"
   [[ -n "${gitlink}" ]] || die "Vendor/mlx-swift-lm is not a gitlink at HEAD; refusing to key a build on it"
   # Blob ids from the index are the content hash of every tracked source; a

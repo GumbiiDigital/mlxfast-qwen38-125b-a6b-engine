@@ -1,31 +1,131 @@
 #!/usr/bin/env bash
-# test-build-cache.sh -- prove tools/build-cache.sh without a toolchain build.
-#   1. the key is stable across two calls and changes when a tracked source changes
-#   2. restore misses on an empty cache; save then restore hits and restores byte-identical artefacts
-#   3. a corrupted cached artefact is a miss, and nothing is restored
-# Hermetic: runs in a scratch git clone of this repository with stub artefacts.
-set -uo pipefail
-ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." >/dev/null && pwd -P)"
-WORK="$(mktemp -d)"; trap 'rm -rf "${WORK}"' EXIT
-fails=0; pass() { printf 'test-build-cache: PASS -- %s\n' "$*"; }; fail() { printf 'test-build-cache: FAIL -- %s\n' "$*" >&2; fails=$((fails + 1)); }
-git clone -q --no-hardlinks "${ROOT_DIR}" "${WORK}/repo" || { fail "cannot clone"; exit 1; }
-cd "${WORK}/repo"
-export MLXFAST_BUILD_CACHE_DIR="${WORK}/cache"
-k1="$(tools/build-cache.sh key)"; k2="$(tools/build-cache.sh key)"
-[[ -n "${k1}" && "${k1}" == "${k2}" ]] && pass "the key is stable (${k1:0:12})" || fail "unstable key: ${k1} vs ${k2}"
-printf '\n// touched\n' >> Package.swift; k3="$(tools/build-cache.sh key)"; git checkout -q -- Package.swift
-[[ "${k3}" != "${k1}" ]] && pass "a tracked source change changes the key" || fail "the key ignored a source change"
-out="$(tools/build-cache.sh restore 2>&1)"; rc=$?
-[[ "${rc}" -eq 1 && "${out}" == *"miss"* ]] && pass "an empty cache is a miss" || fail "empty cache did not miss (rc ${rc}): ${out}"
-mkdir -p .build-worker/release .build/release
-printf 'worker' > .build-worker/release/bench-worker; printf 'lib' > .build-worker/release/mlx.metallib; printf 'mlxfast-metallib-fingerprint-v1 abc\n' > .build-worker/release/mlx.metallib.fingerprint; printf 'cli' > .build/release/mlxfast-swift
-tools/build-cache.sh save >/dev/null || fail "save failed"
+set -euo pipefail
+
+# Stub-only regression test. It materializes the current tools in a temporary
+# git repository and
+# exercises cache save/restore without Swift, Metal, weights, a runner, or a
+# network connection. The production workspace is never modified.
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null && pwd -P)"
+SOURCE_DIR="$(cd -- "${SCRIPT_DIR}/.." >/dev/null && pwd -P)"
+TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/mlxfast-cache-repair.XXXXXX")"
+trap 'rm -rf -- "${TMP_DIR}"' EXIT
+
+REPO="${TMP_DIR}/repo"
+mkdir -p "${TMP_DIR}/bin"
+printf '%s\n' '#!/bin/sh' 'echo "Swift version test-stub"' > "${TMP_DIR}/bin/swift"
+chmod +x "${TMP_DIR}/bin/swift"
+export PATH="${TMP_DIR}/bin:${PATH}"
+
+mkdir -p "${REPO}/tools" "${REPO}/.github/workflows" \
+  "${REPO}/Sources" "${REPO}/Vendor/mlx-swift" \
+  "${REPO}/Runner" "${REPO}/Plugins/TrackBenchRevisionStamp"
+cp "${SOURCE_DIR}/tools/build-cache.sh" "${REPO}/tools/build-cache.sh"
+cp "${SOURCE_DIR}/.github/workflows/benchmark.yml" "${REPO}/.github/workflows/benchmark.yml"
+chmod +x "${REPO}/tools/build-cache.sh"
+
+grep -Fq '.build-worker/release/track-bench-worker' "${REPO}/tools/build-cache.sh"
+grep -Fq "'Runner/*'" "${REPO}/tools/build-cache.sh"
+grep -Fq "'Plugins/*'" "${REPO}/tools/build-cache.sh"
+grep -Fq "'tools/stamp-bench-revision.sh'" "${REPO}/tools/build-cache.sh"
+grep -Fq 'MLXFAST_BENCH_WORKER_EXECUTABLE: .build-worker/release/track-bench-worker' \
+  "${REPO}/.github/workflows/benchmark.yml"
+
+printf '%s\n' 'source' > "${REPO}/Sources/example.swift"
+printf '%s\n' 'metal' > "${REPO}/Vendor/mlx-swift/example.metal"
+printf '%s\n' 'package' > "${REPO}/Package.swift"
+printf '%s\n' 'resolved' > "${REPO}/Package.resolved"
+printf '%s\n' 'runner' > "${REPO}/Runner/Qwen4ExpRunner.swift"
+printf '%s\n' 'plugin' > "${REPO}/Plugins/TrackBenchRevisionStamp/TrackBenchRevisionStamp.swift"
+printf '%s\n' 'stamp' > "${REPO}/tools/stamp-bench-revision.sh"
+printf '%s\n' '#!/bin/sh' 'if [ "${1:-}" = "--print-fingerprint" ]; then printf "test-fingerprint\\n"; fi' \
+  > "${REPO}/tools/build-mlx-metallib.sh"
+chmod +x "${REPO}/tools/build-mlx-metallib.sh"
+
+git -C "${REPO}" init -q
+git -C "${REPO}" config user.email test@example.invalid
+git -C "${REPO}" config user.name cache-repair-test
+git -C "${REPO}" add .
+git -C "${REPO}" update-index --add --cacheinfo \
+  160000,0123456789012345678901234567890123456789,Vendor/mlx-swift-lm
+git -C "${REPO}" commit -qm initial
+
+mkdir -p "${REPO}/.build-worker/release" "${REPO}/.build/release"
+printf '%s\n' 'worker' > "${REPO}/.build-worker/release/track-bench-worker"
+printf '%s\n' 'metallib' > "${REPO}/.build-worker/release/mlx.metallib"
+printf '%s\n' 'mlxfast-metallib-fingerprint-v1 test-fingerprint' \
+  > "${REPO}/.build-worker/release/mlx.metallib.fingerprint"
+printf '%s\n' 'cli' > "${REPO}/.build/release/mlxfast-swift"
+
+export MLXFAST_BUILD_CACHE_DIR="${TMP_DIR}/cache"
+BASE_KEY="$(cd "${REPO}" && tools/build-cache.sh key)"
+STABLE_KEY="$(cd "${REPO}" && tools/build-cache.sh key)"
+[[ -n "${BASE_KEY}" && "${BASE_KEY}" == "${STABLE_KEY}" ]] || {
+  printf '%s\n' 'FAIL: key is not stable across identical calls' >&2
+  exit 1
+}
+
+if EMPTY_OUT="$(cd "${REPO}" && tools/build-cache.sh restore 2>&1)"; then
+  printf '%s\n' 'FAIL: empty cache unexpectedly restored' >&2
+  exit 1
+else
+  EMPTY_RC=$?
+fi
+[[ "${EMPTY_RC}" -eq 1 && "${EMPTY_OUT}" == *miss* ]] || {
+  printf 'FAIL: empty cache did not report a miss (rc %s): %s\n' "${EMPTY_RC}" "${EMPTY_OUT}" >&2
+  exit 1
+}
+
+for tracked in \
+  "Runner/Qwen4ExpRunner.swift" \
+  "Plugins/TrackBenchRevisionStamp/TrackBenchRevisionStamp.swift" \
+  "tools/stamp-bench-revision.sh" \
+  "tools/build-cache.sh"; do
+  cp "${REPO}/${tracked}" "${REPO}/${tracked}.save"
+  printf '%s\n' '# mutation' >> "${REPO}/${tracked}"
+  MUTATED_KEY="$(cd "${REPO}" && tools/build-cache.sh key)"
+  [[ "${MUTATED_KEY}" != "${BASE_KEY}" ]] || {
+    printf 'FAIL: key did not change for %s\n' "${tracked}" >&2
+    exit 1
+  }
+  mv "${REPO}/${tracked}.save" "${REPO}/${tracked}"
+done
+
+cp -R "${REPO}" "${TMP_DIR}/repo2"
+OTHER_KEY="$(cd "${TMP_DIR}/repo2" && tools/build-cache.sh key)"
+[[ "${OTHER_KEY}" != "${BASE_KEY}" ]] || {
+  printf '%s\n' 'FAIL: repositories under different roots share a cache key' >&2
+  exit 1
+}
+
+cd "${REPO}"
+tools/build-cache.sh save >/dev/null
+rm -f .build-worker/release/track-bench-worker \
+  .build-worker/release/mlx.metallib \
+  .build-worker/release/mlx.metallib.fingerprint \
+  .build/release/mlxfast-swift
+[[ ! -e .build-worker/release/bench-worker ]]
+tools/build-cache.sh restore >/dev/null
+[[ -x .build-worker/release/track-bench-worker || -f .build-worker/release/track-bench-worker ]]
+[[ -f .build-worker/release/mlx.metallib ]]
+[[ -f .build-worker/release/mlx.metallib.fingerprint ]]
+[[ -f .build/release/mlxfast-swift ]]
+
+printf '%s\n' 'tampered' > "${MLXFAST_BUILD_CACHE_DIR}/${BASE_KEY}/.build-worker/release/track-bench-worker"
 rm -rf .build-worker .build
-out="$(tools/build-cache.sh restore 2>&1)"; rc=$?
-if [[ "${rc}" -eq 0 && "$(cat .build-worker/release/bench-worker)" == "worker" && "$(cat .build/release/mlxfast-swift)" == "cli" && -f .build-worker/release/mlx.metallib.fingerprint ]]; then pass "save then restore hits and restores the artefacts"; else fail "restore did not reproduce the artefacts (rc ${rc}): ${out}"; fi
-printf 'tampered' > "${MLXFAST_BUILD_CACHE_DIR}/${k1}/.build-worker/release/bench-worker"; rm -rf .build-worker .build
-out="$(tools/build-cache.sh restore 2>&1)"; rc=$?
-[[ "${rc}" -eq 1 && "${out}" == *"does not match"* && ! -e .build/release/mlxfast-swift ]] && pass "a corrupted cached artefact is a miss and nothing is restored" || fail "corruption not refused (rc ${rc}): ${out}"
-kA="$(tools/build-cache.sh key)"; cp -R "${WORK}/repo" "${WORK}/repo2"; kB="$(cd "${WORK}/repo2" && tools/build-cache.sh key)"
-[[ -n "${kA}" && "${kA}" != "${kB}" ]] && pass "the same tree under another root keys differently (products embed their build path)" || fail "two roots share a key: ${kA} ${kB}"
-[[ "${fails}" -eq 0 ]] && { printf 'test-build-cache: all cases pass\n'; exit 0; } || { printf 'test-build-cache: %s failed\n' "${fails}" >&2; exit 1; }
+if CORRUPT_OUT="$(tools/build-cache.sh restore 2>&1)"; then
+  printf '%s\n' 'FAIL: corrupted cache unexpectedly restored' >&2
+  exit 1
+else
+  CORRUPT_RC=$?
+fi
+[[ "${CORRUPT_RC}" -eq 1 && "${CORRUPT_OUT}" == *does\ not\ match* ]] || {
+  printf 'FAIL: corrupted cache was not refused (rc %s): %s\n' "${CORRUPT_RC}" "${CORRUPT_OUT}" >&2
+  exit 1
+}
+[[ ! -e .build-worker/release/track-bench-worker && ! -e .build/release/mlxfast-swift ]] || {
+  printf '%s\n' 'FAIL: corrupted cache partially restored artefacts' >&2
+  exit 1
+}
+
+printf '%s\n' 'PASS: cache saves/restores only track-bench-worker and invalidates Runner/Plugins/stamp changes'
