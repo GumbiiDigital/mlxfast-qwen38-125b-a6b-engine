@@ -1233,14 +1233,14 @@ prose fields (David ruling 2026-08-24). The citation for each value lives in
 `tools/lint-benchmark-manifest.py`, which pins the whole block and refuses a
 drift.
 
-`pairsPerCohort` and `minPairsPerCohort` are 4. The chain, each link
-superseding the one above it: the batch-8 brief defaulted to 4; David ruled 2
-on 2026-08-24, which landed in benchd as commit `bb1a6216` (merged pull request
-184 at `047e2183` on the release branch); David ruled 4 again on 2026-08-26, on
-sample-mass grounds. The benchd side must merge and publish before a resolve
-can obtain a `benchd` that compiles 4, so this value can sit
-RULED-AHEAD-OF-PIN, and an official run declaring 4 against an older channel
-tip is refused at the pin. That refusal is the intended behavior.
+`pairsPerCohort` and `minPairsPerCohort` are 2 (David 2026-09-09: "move to 2
+pairs on both mlx and cuda for now"; "1 pair is not sufficient"). The count
+benchd enforces is the track fixture's `official_pairs`: benchd reads it from
+`--contract` and refuses a ranked run whose fixture does not declare it. Each
+pair is one serial-control leg on the reference tree and one candidate leg at
+the declared depth; per role the per-token times are summed over the pairs and
+the score is the ratio of the sums. `benchmark.json` carries the same number
+for readers, and the lint fails when the two disagree.
 
 ### 9.2 Single-stream only (RULED)
 
