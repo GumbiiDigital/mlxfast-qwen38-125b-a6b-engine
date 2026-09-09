@@ -23,7 +23,6 @@ template <typename T, int N_READS = RMS_N_READS>
     uint simd_group_id [[simdgroup_index_in_threadgroup]]) {
   constexpr int SIMD_SIZE = 32;
 
-  threadgroup float local_inv_mean[1];
   threadgroup float local_sums[SIMD_SIZE];
 
   float acc = 0;
@@ -42,11 +41,13 @@ template <typename T, int N_READS = RMS_N_READS>
     }
   }
   acc = simd_sum(acc);
-  //  Initialize shared memory
-  if (simd_group_id == 0) {
+  // Only unused reduction slots need zero initialization. Each active SIMD
+  // group's lane 0 writes its own slot before the following barrier.
+  uint simd_groups =
+      (axis_size + SIMD_SIZE * N_READS - 1) / (SIMD_SIZE * N_READS);
+  if (simd_group_id == 0 && simd_lane_id >= simd_groups) {
     local_sums[simd_lane_id] = 0;
   }
-  threadgroup_barrier(mem_flags::mem_threadgroup);
 
   // Write simd accumulations into shared memory
   if (simd_lane_id == 0) {
@@ -54,27 +55,23 @@ template <typename T, int N_READS = RMS_N_READS>
   }
   threadgroup_barrier(mem_flags::mem_threadgroup);
 
-  // Accumulate over simd groups
-  if (simd_group_id == 0) {
-    acc = simd_sum(local_sums[simd_lane_id]);
-    if (simd_lane_id == 0) {
-      local_inv_mean[0] = metal::precise::rsqrt(acc / axis_size + eps);
-    }
-  }
-  threadgroup_barrier(mem_flags::mem_threadgroup);
+  // Every SIMD group sees the same read-only local_sums after the
+  // publication barrier, so each can compute its own inverse mean.
+  acc = simd_sum(local_sums[simd_lane_id]);
+  float inv_mean = metal::precise::rsqrt(acc / axis_size + eps);
 
   // Write the outputs using cached x values
   out += gid * size_t(axis_size) + lid * N_READS;
   if (lid * N_READS + N_READS <= axis_size) {
     for (int i = 0; i < N_READS; i++) {
       out[i] =
-          w[w_stride * i] * static_cast<T>(thread_x[i] * local_inv_mean[0]);
+          w[w_stride * i] * static_cast<T>(thread_x[i] * inv_mean);
     }
   } else {
     for (int i = 0; i < N_READS; i++) {
       if ((lid * N_READS + i) < axis_size) {
         out[i] =
-            w[w_stride * i] * static_cast<T>(thread_x[i] * local_inv_mean[0]);
+            w[w_stride * i] * static_cast<T>(thread_x[i] * inv_mean);
       }
     }
   }
