@@ -99,8 +99,10 @@ What it changes:
 - Every other tracked text file: the old track id and the old fixture name become
   the new ones. The port notes, the manifest linter, this procedure and the two
   new-track scripts keep the old names, because they record the source track.
-- `correctness_prompts/<track id>/`: renamed and emptied. Goldens are recorded on
-  the track's own box, as section 5 says.
+- The goldens: nothing to do. A track's goldens are recorded on its own box,
+  published to R2 under `correctness_prompts/<track id>/` and staged on the
+  ranked box as `MLXFAST_QWEN38_GOLDEN_DIR`. They are never in git, so the new
+  track carries none of the source track's and there is no directory to rename.
 
 The script never commits. Review the diff, then commit.
 

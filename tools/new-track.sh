@@ -416,32 +416,13 @@ sys.stderr.write("new-track.sh: runs-on -> [self-hosted, %s, %s] (%d occurrence(
 PYEOF
 fi
 
-# --- 7. the goldens directory ------------------------------------------------
-# Goldens are recorded ON THE TRACK'S OWN BOX, after the port runs. Carrying the
-# source track's goldens into a new track would be a false pin, so the directory
-# is renamed and emptied. index.tsv is kept (empty) because the recorder appends
-# to it and git needs a file to track the directory.
-OLD_GOLDENS="correctness_prompts/${OLD_TRACK_ID}"
-NEW_GOLDENS="correctness_prompts/${TRACK_ID}"
-if [[ -d "${OLD_GOLDENS}" ]]; then
-  INDEX_HEADER=""
-  if [[ -f "${OLD_GOLDENS}/index.tsv" ]]; then
-    # A header line is one that is not a golden record (records are
-    # <name>\t<sha256>\t<bytes>). Keep it if there is one; this template has none.
-    first="$(head -n 1 "${OLD_GOLDENS}/index.tsv" || true)"
-    if [[ -n "${first}" ]] && ! printf '%s' "${first}" | grep -qE '^[^\t]+\t[0-9a-f]{64}\t[0-9]+$'; then
-      INDEX_HEADER="${first}"
-    fi
-  fi
-  rm -rf "${OLD_GOLDENS}" "${NEW_GOLDENS}"
-  mkdir -p "${NEW_GOLDENS}"
-  if [[ -n "${INDEX_HEADER}" ]]; then
-    printf '%s\n' "${INDEX_HEADER}" > "${NEW_GOLDENS}/index.tsv"
-  else
-    : > "${NEW_GOLDENS}/index.tsv"
-  fi
-  note "goldens: ${OLD_GOLDENS} -> ${NEW_GOLDENS}, emptied (they are recorded on the box)"
-fi
+# --- 7. the goldens ----------------------------------------------------------
+# THERE IS NOTHING TO DO HERE, and that is the design. A track's goldens are
+# recorded on ITS OWN BOX, published to R2 under correctness_prompts/<track id>/
+# and staged on the ranked box as MLXFAST_QWEN38_GOLDEN_DIR. They are never in
+# git, so a new track carries none of the source track's and there is no
+# directory to rename. The new track's contract pins its own keys once its
+# goldens are recorded.
 
 # --- 8. the engine submodule pin ---------------------------------------------
 # The gitlink IS the pin. .gitmodules keeps its url: the fork is the same

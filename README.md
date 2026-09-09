@@ -24,6 +24,22 @@ that same session. No file stores it.
 in `live_golden`. The pool of 8 pinned prompts is the CORRECTNESS pool: the box
 stages all 8 and the preflight verifies all 8, but the timed leg runs the one.
 
+> **NOTE — the track goldens are not in this repository.**
+> The 8 timed-pool tapes and the 6 per-depth oracles are organizer material.
+> They are published in R2 at the `r2_path` keys the contract pins. The ranked
+> box stages them out of band into the directory its runner service exports as
+> `MLXFAST_QWEN38_GOLDEN_DIR`. `tools/ranked-box-preflight.sh` verifies every
+> file there against the contract's `{sha256, bytes}` and refuses an extra
+> `*.json`. They are never in git, so your clone does not carry them.
+>
+> The organizer stages them with the signer this repository vendors:
+>
+> ```bash
+> R2_BUCKET_ENDPOINT=... R2_ACCESS_KEY_ID=... R2_SECRET_ACCESS_KEY=... \
+>   tools/fetch-goldens.sh --all --out "$MLXFAST_QWEN38_GOLDEN_DIR"
+> tools/ranked-box-preflight.sh
+> ```
+
 > Official scoring is armed and the ranked box is registered. Section
 > [Current status](#current-status) states each fact.
 > `docs/qwen38-125b-a6b-port-notes.md` is the engineering record.
@@ -169,7 +185,7 @@ checkpoint. See [The MTP head is embedded](#the-mtp-head-is-embedded).
 | `tools/` | Setup, build, lint, and measurement scripts. | Trusted |
 | `benchd-bin/` | Where `./tools/fetch-benchd.sh` installs the verified binary. Git ignores it. | Fetched |
 | `mtp-head.manifest.json` | The MTP head declaration. It declares; it carries no weights. | Editable, optional |
-| `correctness_prompts/` | The public prompt and the two public goldens. | Trusted |
+| `correctness_prompts/` | The public prompt and the two public goldens, for local runs. The track goldens are NOT here: they live in R2 and on the ranked box. | Trusted |
 | `weights/` | The transformed weights the engine loads. | Generated |
 | `benchmark.json` | The Yukon track manifest. It lists every editable path. | Trusted |
 
@@ -178,8 +194,8 @@ checkpoint. See [The MTP head is embedded](#the-mtp-head-is-embedded).
 This repository is the template for the next track. Seed a new repository with a
 copy of this tree, then run `tools/new-track.sh` in it. The script stamps the new
 identity into the manifest, the contract fixture, the checkpoint file list, the
-runner label, the engine pin and the docs, and it empties the goldens directory.
-It never commits. `docs/new-track-repo-procedure.md` holds the full procedure and
+runner label, the engine pin and the docs. It touches no golden: a track's
+goldens live in R2 and on its own box, never in git. It never commits. `docs/new-track-repo-procedure.md` holds the full procedure and
 the usage line.
 
 ### The engine is a submodule

@@ -51,8 +51,10 @@ Official scoring is armed. `fixtures/qwen3_8_125b_a6b_track.json` sets
 hidden correctness oracle by sha256 and bytes, names `botany` as the live
 golden, pins one per-depth oracle for each draft depth 1 to 6, and names the
 engine commit the reference tree must be at in `baseline_reference_commit`. The
-goldens in `correctness_prompts/` were recorded on the ranked box from the
-pinned Qwen checkpoint.
+goldens are organizer material: they are published in R2 at the `r2_path` keys
+the fixture pins, and the ranked box stages them out of band into the directory
+its runner service exports as `MLXFAST_QWEN38_GOLDEN_DIR`. They are never in
+git.
 
 Scoring is paired, with a per-box baseline (David ruling 2026-09-08). A ranked
 run measures two legs on the same box in the same job, over the one live

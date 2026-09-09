@@ -256,15 +256,15 @@ else
   fail "gitlink is '${gitlink}', expected ${FORK_SHA}"
 fi
 
-# the goldens directory
+# the goldens
+# They are never in git: a track's goldens are published in R2 and staged on its
+# own box. So the stamped seed must carry NEITHER track's goldens, and there is
+# no directory for the tool to rename.
 group
-if [[ -d "${SEED}/correctness_prompts/${NEW_TRACK}" && ! -d "${SEED}/correctness_prompts/${OLD_TRACK}" ]]; then
-  left="$(find "${SEED}/correctness_prompts/${NEW_TRACK}" -type f ! -name index.tsv | wc -l | tr -d ' ')"
-  [[ "${left}" == "0" ]] || fail "the new goldens directory still holds ${left} file(s); goldens are recorded on the box"
-  [[ -f "${SEED}/correctness_prompts/${NEW_TRACK}/index.tsv" ]] || fail "index.tsv was not kept"
-  group_ok "the goldens directory was renamed and emptied, index.tsv kept"
+if [[ -d "${SEED}/correctness_prompts/${NEW_TRACK}" || -d "${SEED}/correctness_prompts/${OLD_TRACK}" ]]; then
+  fail "the stamped seed carries a track goldens directory: $(ls "${SEED}/correctness_prompts")"
 else
-  fail "the goldens directory was not renamed: $(ls "${SEED}/correctness_prompts")"
+  group_ok "the stamped seed carries no track goldens (they live in R2 and on the box)"
 fi
 
 # the source track id is gone everywhere but the exemptions

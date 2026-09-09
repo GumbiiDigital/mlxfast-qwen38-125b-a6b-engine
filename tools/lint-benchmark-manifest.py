@@ -1125,6 +1125,68 @@ class Linter:
             )
         return contract
 
+    # -- 5a2 ---------------------------------------------------------------
+    def check_track_goldens_absent(self, contract: dict) -> None:
+        """No pinned track golden may sit in this repository.
+
+        THE TAPES ARE ORGANIZER MATERIAL, AND THEY ARE NOT IN GIT. The 8
+        timed-pool tapes and the per-depth oracles are published in R2 at the
+        r2_path keys the contract pins, and the ranked box stages them out of
+        band into the directory its runner service exports as
+        MLXFAST_QWEN38_GOLDEN_DIR. tools/ranked-box-preflight.sh verifies every
+        staged file against the contract's {sha256, bytes} and refuses an extra
+        *.json there.
+
+        So the correct state of this tree is that every pinned r2_path is
+        ABSENT, and this check says so out loud rather than leaving it to
+        nobody. A pinned golden that reappears in the checkout is refused by
+        name: a committed copy is organizer material in a participant's clone,
+        and it is also a second source of truth for bytes the box already pins.
+
+        The PUBLIC goldens beside them (correctness_prompts/public_*) are
+        participant material for local runs. They are not pinned in
+        timed_prompt_pool or live_golden_speculative, so this check never looks
+        at them.
+        """
+        pinned: set[str] = set()
+        for entry in contract.get("timed_prompt_pool", []):
+            if isinstance(entry, dict) and isinstance(entry.get("r2_path"), str):
+                pinned.add(entry["r2_path"])
+        for entry in (contract.get("live_golden_speculative") or {}).values():
+            if isinstance(entry, dict) and isinstance(entry.get("r2_path"), str):
+                pinned.add(entry["r2_path"])
+        if not pinned:
+            # A track stamped by tools/new-track.sh pins nothing yet: its
+            # goldens are recorded on its own box after the port runs. That is
+            # legal only while official_scoring_enabled is false, exactly as the
+            # empty-pool case above is.
+            if contract.get("official_scoring_enabled", False):
+                self.fail(
+                    "goldens: the contract pins no r2_path but scoring is ARMED; there is "
+                    "nothing for the box to stage and nothing to assert about this tree"
+                )
+            else:
+                self.ok(
+                    "goldens: the contract pins no r2_path and scoring is not armed "
+                    "(a stamped track pending its goldens)"
+                )
+            return
+
+        present = [rel for rel in sorted(pinned) if os.path.exists(self.abspath(rel))]
+        if present:
+            for rel in present:
+                self.fail(
+                    f"goldens: {rel} is present in this repository. The track tapes are "
+                    "organizer material: they are published in R2 at the pinned r2_path "
+                    "keys and staged on the ranked box as MLXFAST_QWEN38_GOLDEN_DIR, and "
+                    "they are never in git. Delete the file"
+                )
+            return
+        self.ok(
+            f"goldens: none of the {len(pinned)} pinned track golden(s) is in this tree "
+            "(they live in R2 and on the box, staged as MLXFAST_QWEN38_GOLDEN_DIR)"
+        )
+
     # -- 5b ----------------------------------------------------------------
     def check_no_golden_baseline_pair(self, contract: dict) -> None:
         """No golden may carry a stored baseline pair.
@@ -1203,6 +1265,12 @@ class Linter:
                     "(serial-control leg + candidate leg), so a stored baseline is a stale "
                     "denominator and the ranked path refuses it"
                 )
+            return
+        if scanned == 0:
+            self.ok(
+                "goldens: this tree carries no golden file to scan for a stored baseline "
+                "pair; the pinned tapes live in R2 and on the box (check 5a2)"
+            )
             return
         self.ok(
             f"goldens: none of the {scanned} golden file(s) carries a stored baseline pair "
@@ -1334,6 +1402,7 @@ class Linter:
         self.check_byte_budget(manifest)
         self.check_commands(manifest)
         contract = self.check_contract(manifest)
+        self.check_track_goldens_absent(contract)
         self.check_no_golden_baseline_pair(contract)
         self.check_baseline_reference_commit(contract)
         self.check_scoring(manifest, contract)

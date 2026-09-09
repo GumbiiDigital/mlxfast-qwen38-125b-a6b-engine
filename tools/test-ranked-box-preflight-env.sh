@@ -36,7 +36,6 @@ fail() {
 command -v jq >/dev/null 2>&1 || { echo "test-ranked-box-preflight-env.sh: jq is required" >&2; exit 1; }
 command -v git >/dev/null 2>&1 || { echo "test-ranked-box-preflight-env.sh: git is required" >&2; exit 1; }
 
-TRACK_DIR="correctness_prompts/qwen3.8-125b-a6b-mlx-v1"
 TRACK_ID="$(jq -r '.track_id' "${REPO_ROOT}/fixtures/qwen3_8_125b_a6b_track.json")"
 BOX_NAME="synthetic-ranked-box"
 
@@ -48,13 +47,43 @@ chmod +x "${ROOT}/tools/ranked-box-preflight.sh"
 cp "${REPO_ROOT}/fixtures/qwen3_8_125b_a6b_track.json" "${ROOT}/fixtures/"
 
 # The staged golden pool: the pinned cohort and nothing else (the preflight
-# refuses an unpinned *.json beside it, so the copy is pin-driven).
+# refuses an unpinned *.json beside it, so the staging is pin-driven).
+#
+# THE REAL TAPES ARE NOT IN ANY TREE. They are organizer material published in
+# R2 and staged on the box, so this suite stages a SYNTHETIC pool and RE-PINS
+# the copy of the contract in ${ROOT} to it. Only sha256 and bytes move; every
+# other field is the shipped fixture's, so the arm gate, the depth envelope and
+# baseline_reference_commit stay under test, and so does the whole
+# byte-then-sha verification the preflight performs.
 GOLDEN_DIR="${WORK}/goldens"
 mkdir -p "${GOLDEN_DIR}"
-while read -r name; do
-  cp "${REPO_ROOT}/${TRACK_DIR}/${name}" "${GOLDEN_DIR}/${name}"
-done < <(jq -r '[.timed_prompt_pool[].r2_path, (.live_golden_speculative // {} | to_entries[].value.r2_path)][] | split("/")[-1]' \
-  "${ROOT}/fixtures/qwen3_8_125b_a6b_track.json" | sort -u)
+python3 - "${ROOT}/fixtures/qwen3_8_125b_a6b_track.json" "${GOLDEN_DIR}" <<'REPINEOF'
+import hashlib, json, os, sys
+
+contract_path, golden_dir = sys.argv[1:3]
+contract = json.load(open(contract_path, encoding="utf-8"))
+
+
+def stage(r2_path):
+    base = r2_path.rsplit("/", 1)[-1]
+    path = os.path.join(golden_dir, base)
+    if not os.path.exists(path):
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(json.dumps({"synthetic_golden": base}) + "\n")
+    data = open(path, "rb").read()
+    return hashlib.sha256(data).hexdigest(), len(data)
+
+
+for entry in contract.get("timed_prompt_pool", []):
+    entry["sha256"], entry["bytes"] = stage(entry["r2_path"])
+for entry in (contract.get("live_golden_speculative") or {}).values():
+    entry["sha256"], entry["bytes"] = stage(entry["r2_path"])
+with open(contract_path, "w", encoding="utf-8") as fh:
+    json.dump(contract, fh, indent=2)
+    fh.write("\n")
+REPINEOF
+compgen -G "${GOLDEN_DIR}/*.json" >/dev/null \
+  || { echo "FAIL: could not stage the synthetic golden pool" >&2; exit 1; }
 
 # A temperature reader that moves, so the frozen-sensor guard passes without
 # asserting anything about a real sensor.
