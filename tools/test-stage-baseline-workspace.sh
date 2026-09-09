@@ -56,7 +56,7 @@ else
   # tree's own transform.
   for needle in \
     "swift build -c release --force-resolved-versions --product mlxfast-swift" \
-    "swift build -c release --force-resolved-versions --scratch-path .build-worker --product bench-worker" \
+    "swift build -c release --force-resolved-versions --scratch-path .build-worker --product track-bench-worker" \
     "tools/build-mlx-metallib.sh" \
     "tools/stage-bench-worker.sh" \
     "mlxfast-swift transform --reference"
@@ -69,7 +69,7 @@ else
   # can transform. A dry run that printed these out of order would document a
   # build that cannot work.
   order_ok="$(awk '
-    /--product bench-worker/ { worker = NR }
+    /--product track-bench-worker/ { worker = NR }
     /tools\/build-mlx-metallib.sh/ { metallib = NR }
     /tools\/stage-bench-worker.sh/ { stage = NR }
     /mlxfast-swift transform/ { transform = NR }

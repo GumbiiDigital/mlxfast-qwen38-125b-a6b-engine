@@ -225,7 +225,14 @@ resolve_cap() { # resolve_cap VAR_NAME CONTRACT_KEY FALLBACK
 # Vendor/mlx-swift-lm entries (the fork is a submodule, so its files are not
 # editable): 1658207 bytes at rest over 110 files, plus the stated 1 MiB
 # margin.
-resolve_cap MAX_BYTES maxTotalBytes 2706783
+#
+# RAISED AGAIN 2026-09-08, from 2706783 to 3771619, when `Runner/` joined the
+# editable surface. The Runner is the model family's code, and it lived inside
+# the pinned fork submodule where a participant could not edit it; the copy
+# adds 16260 bytes, and the cap moves by that plus the same 1 MiB margin. The
+# old cap was already 72284 bytes under the stated minimum margin before the
+# Runner arrived.
+resolve_cap MAX_BYTES maxTotalBytes 3771619
 resolve_cap MAX_FILE_BYTES maxFileBytes 524288
 resolve_cap MAX_GROWTH_BYTES maxGrowthBytes 262144
 
