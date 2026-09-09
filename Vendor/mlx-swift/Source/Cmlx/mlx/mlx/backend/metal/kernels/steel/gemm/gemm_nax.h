@@ -70,10 +70,15 @@ auto gemm_loop(
 
       if constexpr (kAlignedM) {
         Atile.load(A + A_offset, lda);
+      } else if constexpr (transpose_a) {
+        Atile.load_safe(A + A_offset, lda, short2(sgp_sm, SK));
       } else {
-        const short rmax = transpose_a ? SK : sgp_sm;
-        const short cmax = transpose_a ? sgp_sm : SK;
-        Atile.load_safe(A + A_offset, lda, short2(cmax, rmax));
+        // Untransposed A gives load_safe a column limit of SK, the full
+        // fragment width, so its per-element column test can never fire.
+        // load_rows reads the same elements, zeroes the same ones and drops
+        // the predicate, which lets the four contiguous values in a row load
+        // as one vector.
+        Atile.load_rows(A + A_offset, lda, sgp_sm);
       }
 
       if constexpr (kAlignedN) {
