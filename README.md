@@ -875,3 +875,7 @@ checkpoint carries the Qwen Community License 1.0. The terms ship with the
 checkpoint at its pinned revision. This repository distributes no model
 weights. [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) holds the full
 third-party attribution.
+
+### Audit an official score receipt
+
+Use the read-only [score-contract audit](docs/score-contract-audit.md) to check whether an official receipt reports the decode floor declared by this track. It is a diagnostic, not a scoring override.
