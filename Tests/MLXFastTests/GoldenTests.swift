@@ -21,33 +21,27 @@ func checkedInPublicCorrectnessGoldenIsValid() throws {
     // assertions below are the inversion that regeneration was waiting for:
     // both goldens now LOAD, through the strict Qwen-identity loader.
     //
-    // Provenance of the bytes, recorded here and in the engine port notes
-    // section 5.3:
-    //
-    //   engine commit  4a1e000212859ceb13913d2f067cdc8d2a1ae32d (merged main)
-    //   target         Vontra/Qwen3.8-Flash-Next-MLX-4bit-MTP
-    //                  @ 327c8a604de613b42f84ba5e6b796c0931e8aa3b
-    //   model_type     qwen4_exp_text
-    //   generation     A and B, a fresh `generate-golden` process each,
-    //                  asserted byte-identical before either was pinned
-    //
-    // The PROMPT file is unchanged and its digest above still holds: only the
-    // expected tokens and the provenance block moved.
+    // Provenance of the bytes: each file's `model_provenance` block names the
+    // pinned target, Vontra/Qwen3.8-Flash-Next-MLX-4bit-MTP
+    // @ 327c8a604de613b42f84ba5e6b796c0931e8aa3b, model_type qwen4_exp_text.
+    // The digests and byte counts below are the checked-in files of this
+    // repository's root commit; the PROMPT file is unchanged and its digest
+    // above still holds.
     let path = MLXFastConstants.defaultPublicCorrectnessGoldenPath
     let data = try Data(contentsOf: URL(fileURLWithPath: path))
     let digest = SHA256.hash(data: data)
         .map { String(format: "%02x", $0) }
         .joined()
-    #expect(digest == "385af04443b1cbc1656ae9fcb3c403171ee925cc0ac557b96973f2629ff1261d")
-    #expect(data.count == 17_910)
+    #expect(digest == "69d22f9a4a27b826882097e6e75e4ba15c75691a37e1730cf9cb11c7488475d7")
+    #expect(data.count == 43_622)
 
     let localSubmitPath = MLXFastConstants.defaultPublicLocalSubmitGoldenPath
     let localSubmitData = try Data(contentsOf: URL(fileURLWithPath: localSubmitPath))
     let localSubmitDigest = SHA256.hash(data: localSubmitData)
         .map { String(format: "%02x", $0) }
         .joined()
-    #expect(localSubmitDigest == "bc22a71eaffd4b51be696123ee6c1e636f76d81ba44c30faf844108194d9fe71")
-    #expect(localSubmitData.count == 28_498)
+    #expect(localSubmitDigest == "bcde478f61456fa33a05ce5f94175c3f93644426f8277ffc40ebddb3b5092b45")
+    #expect(localSubmitData.count == 54_344)
 
     // THEY LOAD, and through `loadQwenGoldenFixture` -- the wrapper that pins
     // the model identity on top of the provenance check, so this exercises
@@ -61,7 +55,7 @@ func checkedInPublicCorrectnessGoldenIsValid() throws {
         #expect(fixture.modelType == MLXFastConstants.requiredGoldenModelType)
         #expect(fixture.cases.count == 1)
         let onlyCase = try #require(fixture.cases.first)
-        #expect(onlyCase.name == "longcopy-gate-english-1024")
+        #expect(onlyCase.name == "public-longcopy-gate-english-1024")
         #expect(onlyCase.promptTokens.count == MLXFastConstants.correctnessPromptTokens)
         #expect(onlyCase.expectedTokens.count == steps)
     }
