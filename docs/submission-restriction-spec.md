@@ -32,7 +32,7 @@ a submission may CONTAIN and how much of it — are:
 
 | File | Role |
 |---|---|
-| `Sources/MLXFastTrustedHarness/EditableSurfaceByteBudget.swift` | launch-time byte budget |
+| `Sources/MLXFastTrustedHarness/EditableSurfaceByteBudget.swift` | the byte-budget enforcer (upstream: launch-time; here it runs in the test suite only, see §1) |
 | `.github/scripts/run-submission-static-review.sh` | pre-dispatch deterministic caps + LLM bypass judge |
 | `.github/scripts/overlay-editable-paths.sh` | archive -> trusted checkout overlay, REPLACE semantics |
 | `.github/scripts/enforce-modifiable-surface.sh` | diff-level surface allowlist |
@@ -53,14 +53,14 @@ be wrong about it:
 The earlier revision of this section claimed the four-file table was the whole
 surface. It was false, and the fail-closed reading is the one written above:
 treat the extracted four as a floor, not a boundary. Nothing in §§2-5 depends on
-the difference — those sections cite the four files directly — but §1's "four
-independent gates" is likewise a statement about what this repository
-re-implements, not a census of upstream.
+the difference — those sections cite the four files directly — but §1's gate
+list is likewise a statement about what this repository re-implements, not a
+census of upstream.
 
 ## 1. Layer map
 
-An untrusted submission passes four independent gates. Each is fail-closed on
-its own; none is load-bearing alone.
+An untrusted submission passes three gates that run here. Each is fail-closed
+on its own; none is load-bearing alone.
 
 ```text
 archive ──► overlay-editable-paths.sh      REPLACE only editablePaths; refuse
@@ -71,23 +71,32 @@ archive ──► overlay-editable-paths.sh      REPLACE only editablePaths; ref
    ├──────► enforce-modifiable-surface.sh  diff vs BASE must touch nothing
             (submission checkout as cwd)   outside the BASE contract's surface
    │
-   ├──────► static-review checks           per-file / total / growth byte caps,
+   └──────► static-review checks           per-file / total / growth byte caps,
             (deterministic half)           path validation, exempt handling
-   │                                       ── then the LLM bypass judge
-   │
-   └──────► EditableSurfaceByteBudget      launch-time re-enforcement of the
-            (trusted CLI, worker spawn)    per-file and total caps, binding
-                                           every dispatch path including ones
-                                           that never ran the review step
+                                           ── then the LLM bypass judge
 ```
 
-The double enforcement of the byte caps is explicit in the original:
+On a ranked dispatch the hosted `surface-check` job in
+`.github/workflows/benchmark.yml` runs the third gate. It runs
+`tools/lint-benchmark-manifest.py`, then
+`.github/scripts/submission-static-review-checks.sh` in whole-surface mode,
+which applies `maxTotalBytes` and `maxFileBytes` over the whole editable
+surface. The ranked job needs `surface-check`, so a submission that fails it
+never reaches a box.
+
+The original enforces the byte caps a second time at launch:
 `EditableSurfaceByteBudget.swift@bfab0de:4-13` states that the judge applies the
 policy but "these mechanical caps are the launch-time backstop that binds every
 ranked worker launch path, including dispatches that never pass through the
 review step."
 
-## 2. R1 — launch-time byte budget
+**That second enforcement does not run here.** No command path and no workflow
+path calls `verifyEditableSurfaceByteBudget`. The only caller is
+`tools/editable-surface-budget-cli`, which `tools/test-submission-security.sh`
+builds and runs, so the Swift verifier is exercised by the test suite only.
+§9 records the launch-time call site as deferred to runner provisioning.
+
+## 2. R1 — the byte budget
 
 Source: `Sources/MLXFastTrustedHarness/EditableSurfaceByteBudget.swift@bfab0de:1-157`,
 called from `Sources/MLXFastCLI/main.swift@bfab0de:2286` inside the runtime-worker
@@ -149,7 +158,8 @@ that ruling; see D8 in §7 and the #20 items in §8, which record the boundary
 between the fail-closed fixes (a–d) and this size-only ruling (e).
 
 **Re-implementation:** `Sources/MLXFastTrustedHarness/EditableSurfaceByteBudget.swift`
-in this repository. R1.1–R1.14 hold. Divergences D1–D4 in §7.
+in this repository. R1.1–R1.13 hold. R1.14 does not: nothing here calls the
+verifier at worker spawn. Divergences D1–D4 in §7.
 
 ## 3. R2 — static review, deterministic half
 

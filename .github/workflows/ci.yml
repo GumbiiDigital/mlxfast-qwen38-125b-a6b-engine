@@ -12,10 +12,12 @@
 #     over .github/, not a proof of confinement: see the header of
 #     tools/ci-workflow-egress-scan.sh for exactly what it does and does not
 #     detect;
-#   - no submodule checkout: this repository has none since benchd became a
-#     channel prebuilt (tools/fetch-benchd.sh). The setting is retained so a reintroduced
-#     private submodule cannot pull a credential into this pipeline, which is
-#     required to hold none;
+#   - one submodule checkout, and it takes no credential: Vendor/mlx-swift-lm
+#     is the engine fork, pinned by gitlink to a PUBLIC repository
+#     (Layr-Labs/mlx-swift-lm), so the swift job fetches it anonymously. The
+#     lint job stays submodules: false (nothing there builds). A private
+#     submodule would fail that fetch rather than pull a credential in, which
+#     is the property this pipeline keeps;
 #   - no model weights, no R2, no network fetch beyond the SwiftPM dependency
 #     graph, and nothing that would want the ranked box.
 #
@@ -283,7 +285,10 @@ jobs:
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
-          submodules: false
+          # Package.swift path-depends on Vendor/mlx-swift-lm, the engine fork
+          # submodule. The fork repository is public, so this fetch needs no
+          # credential and persist-credentials stays false.
+          submodules: true
           persist-credentials: false
 
       - name: Toolchain preflight

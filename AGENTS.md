@@ -176,10 +176,9 @@ heat the GPU and throttle it. A 2-minute to 3-minute pause between local runs is
 normal.
 
 > **WARNING — a local score is directional.**
-> The local test runs a single stream. The ranked run runs a batch-8 cohort. The
-> forward pass takes structurally different kernel paths at cohort width. The
-> MoE expert-sort path engages at batch 8 and not at width 1. Do not read a
-> local score as a prediction of the ranked composite.
+> The local test and the ranked run use different machines, and only the ranked
+> run measures the paired legs under the scored gates. Do not read a local
+> score as a prediction of the ranked composite.
 
 Record a same-machine baseline before you optimize. Sync to the latest tip
 first. Do not compare a change against a stale branch or an old local run. Rerun
@@ -360,7 +359,7 @@ Swift model code.
 Good changes improve one or more of these.
 
 - Kernel-level work inside the vendored Metal sources. Prioritize kernels the
-  cohort prefill and the timed decode window reach.
+  prefill and the timed decode window reach.
 - The batching engine. Admission, scheduling, round driving, and stream drain
   are competitive surface.
 - Attention dispatch. The tower mixes 12 full-attention layers with 36 gated
@@ -407,10 +406,11 @@ flip a near-tie greedy argmax.
 > 2026-08-26) — re-quantize the head within its 2 GiB declaration cap, but do
 > not replace it and do not upload head weights. The head is embedded in the
 > pinned target checkpoint, and `mtp-head.manifest.json` accepts
-> `"source": "pinned"` only. A head re-quantization happens ON LOAD, in memory:
-> the head loader calls `quantize(model:)` while it binds the checkpoint, and
-> the file that holds that call is editable (`Qwen4ExpMTP.swift`). Nothing on
-> disk changes (`docs/participant-contract.md` section 4.4).
+> `"source": "pinned"` only. A head re-quantization happens ON LOAD, in memory,
+> and nothing on disk changes. The head loader is in the pinned
+> `Vendor/mlx-swift-lm` submodule, which is not editable, so a head
+> re-quantization is not shippable through the editable surface today
+> (`docs/participant-contract.md` section 4.4).
 > The head only proposes tokens; the pinned target decides every emitted token.
 > The target's own quantization is verified on the LOADED model TWICE: once at
 > worker startup, and again at the top of every window that gets measured,

@@ -4,8 +4,8 @@
 > for the retired serial track (`laguna-xs-2.1-serial-v2`): a prefill + decode
 > window scored as `decode_speedup^0.75 * prefill_speedup^0.25` over 128 decode
 > steps, on that track's ranked self-hosted runner. That track is retired.
-> The LIVE ranked track is `qwen3.8-125b-a6b-mlx-v1`. Its window is a batch-8
-> cohort over a 1024-token seed and a 128-step decode window, scored as
+> The LIVE ranked track is `qwen3.8-125b-a6b-mlx-v1`. Its window is one stream
+> over a 1024-token seed and a 128-step decode window, scored as
 > `composite = prefill_gain^0.25 * decode_gain^0.75`. For the live window and
 > scoring see `docs/participant-contract.md` section 5 and `benchmark.json`.
 > Everything below is retained as the serial-era record; read
