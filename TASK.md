@@ -59,11 +59,10 @@ declaration. A declared `sha256` is optional, and the runner does not verify it.
 A re-quantization happens ON LOAD, in memory. Nothing on disk changes, and no
 artifact travels in a submission.
 
-The head loader calls `quantize(model:)` while it binds the checkpoint. That
-call is the seam, and the file that holds it is an editable path:
-`Vendor/mlx-swift-lm/Libraries/MLXLLM/Models/Qwen4ExpMTP.swift`. Change the
-geometry that call selects. `docs/participant-contract.md` section 4.4 is the
-authority.
+The head loader is in the `Vendor/mlx-swift-lm` submodule. That submodule is
+pinned and it is not editable. No editable path holds the loader today, so a
+head re-quantization is not shippable through the editable surface.
+`docs/participant-contract.md` section 4.4 is the authority.
 
 > **WARNING — the target quantization is frozen.**
 > Do not re-quantize any target weight. Do not re-represent one. Do not change
@@ -72,8 +71,8 @@ authority.
 > head is a narrow exception, and the exception is re-quantization only. You may
 > re-quantize the head within its 2 GiB declaration cap. You may not replace it.
 
-> **NOTE — batch size is locked. Draft depth is not.**
-> The batch size stays 8. You may not tune it.
+> **NOTE — the scored batch size is locked. Draft depth is not.**
+> The scored batch size is 1. It is not a tunable.
 >
 > The draft depth is a free lever, set from your own drafter code, which is
 > editable. It is not pinned at 1.
@@ -128,12 +127,11 @@ gain      = baseline_aggregate / candidate_aggregate
 
 The score is serial-anchored. A faster candidate scores above 1.
 
-`aggregate` is the per-stream sum. Add each of the 8 concurrent streams' own
-elapsed time together. Do this for prefill and for decode separately, on both
-legs.
+`aggregate` is the per-stream sum. Add each stream's own elapsed time
+together. Do this for prefill and for decode separately, on both legs.
 
-The ranked run measures a batch-8 cohort over a 1024-token seed and a 128-step
-decode window. It runs 4 pairs per cohort. The floor is 0.90. The ceiling is
+The ranked run measures one stream at a time over a 1024-token seed and a
+128-step decode window. It runs 4 pairs. The floor is 0.90. The ceiling is
 5.0. The KV backend is pinned `contiguous`.
 
 The benchmarker applies a per-stream token-tolerance gate with a 10% budget.
@@ -155,19 +153,18 @@ The benchmarker applies a per-stream token-tolerance gate with a 10% budget.
 > **NOTE — the engine is pinned to an unmerged fork branch.**
 > `Vendor/mlx-swift-lm` is a git submodule at `449f2d0`, on branch
 > `feat/qwen38-flash-next-runner`. Re-pin it to the fork's `main` after that
-> branch merges. The B=8 cohort path needs a ContinuousBatchingV2 adaptation,
-> because the QSA sparse attention emits a custom array mask that the CBv2
-> path discards by contract. `docs/qwen38-125b-a6b-port-notes.md` holds the
+> branch merges. The batched cohort path needs a ContinuousBatchingV2
+> adaptation, because the QSA sparse attention emits a custom array mask that
+> the CBv2 path discards by contract. `docs/qwen38-125b-a6b-port-notes.md` holds the
 > detail.
 
 The repositories stay private until launch.
 
 ## Local runs are directional
 
-The local test runs a single stream. The ranked run runs 8 streams at once. The
-forward pass takes structurally different kernel paths at cohort width. Treat a
-local score as a smoke signal, not as a prediction. The ranked M5 run is the
-authority.
+The local test and the ranked run use different machines, and only the ranked
+run measures the paired legs under the scored gates. Treat a local score as a
+smoke signal, not as a prediction. The ranked M5 run is the authority.
 
 ## Authorities
 
