@@ -59,6 +59,23 @@ printf '%s\n' 'cli' > "${REPO}/.build/release/mlxfast-swift"
 
 export MLXFAST_BUILD_CACHE_DIR="${TMP_DIR}/cache"
 BASE_KEY="$(cd "${REPO}" && tools/build-cache.sh key)"
+STABLE_KEY="$(cd "${REPO}" && tools/build-cache.sh key)"
+[[ -n "${BASE_KEY}" && "${BASE_KEY}" == "${STABLE_KEY}" ]] || {
+  printf '%s\n' 'FAIL: key is not stable across identical calls' >&2
+  exit 1
+}
+
+if EMPTY_OUT="$(cd "${REPO}" && tools/build-cache.sh restore 2>&1)"; then
+  printf '%s\n' 'FAIL: empty cache unexpectedly restored' >&2
+  exit 1
+else
+  EMPTY_RC=$?
+fi
+[[ "${EMPTY_RC}" -eq 1 && "${EMPTY_OUT}" == *miss* ]] || {
+  printf 'FAIL: empty cache did not report a miss (rc %s): %s\n' "${EMPTY_RC}" "${EMPTY_OUT}" >&2
+  exit 1
+}
+
 for tracked in \
   "Runner/Qwen4ExpRunner.swift" \
   "Plugins/TrackBenchRevisionStamp/TrackBenchRevisionStamp.swift" \
@@ -74,6 +91,13 @@ for tracked in \
   mv "${REPO}/${tracked}.save" "${REPO}/${tracked}"
 done
 
+cp -R "${REPO}" "${TMP_DIR}/repo2"
+OTHER_KEY="$(cd "${TMP_DIR}/repo2" && tools/build-cache.sh key)"
+[[ "${OTHER_KEY}" != "${BASE_KEY}" ]] || {
+  printf '%s\n' 'FAIL: repositories under different roots share a cache key' >&2
+  exit 1
+}
+
 cd "${REPO}"
 tools/build-cache.sh save >/dev/null
 rm -f .build-worker/release/track-bench-worker \
@@ -86,5 +110,22 @@ tools/build-cache.sh restore >/dev/null
 [[ -f .build-worker/release/mlx.metallib ]]
 [[ -f .build-worker/release/mlx.metallib.fingerprint ]]
 [[ -f .build/release/mlxfast-swift ]]
+
+printf '%s\n' 'tampered' > "${MLXFAST_BUILD_CACHE_DIR}/${BASE_KEY}/.build-worker/release/track-bench-worker"
+rm -rf .build-worker .build
+if CORRUPT_OUT="$(tools/build-cache.sh restore 2>&1)"; then
+  printf '%s\n' 'FAIL: corrupted cache unexpectedly restored' >&2
+  exit 1
+else
+  CORRUPT_RC=$?
+fi
+[[ "${CORRUPT_RC}" -eq 1 && "${CORRUPT_OUT}" == *does\ not\ match* ]] || {
+  printf 'FAIL: corrupted cache was not refused (rc %s): %s\n' "${CORRUPT_RC}" "${CORRUPT_OUT}" >&2
+  exit 1
+}
+[[ ! -e .build-worker/release/track-bench-worker && ! -e .build/release/mlxfast-swift ]] || {
+  printf '%s\n' 'FAIL: corrupted cache partially restored artefacts' >&2
+  exit 1
+}
 
 printf '%s\n' 'PASS: cache saves/restores only track-bench-worker and invalidates Runner/Plugins/stamp changes'
