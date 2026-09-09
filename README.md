@@ -325,19 +325,18 @@ optional, and the runner does not verify it against the head bytes.
 `docs/participant-contract.md` section 4.3 states that limit plainly.
 
 A re-quantization happens ON LOAD, in memory. Nothing on disk changes. The head
-loader calls `quantize(model:)` while it binds the checkpoint, and the file
-that holds that call is an editable path:
-`Vendor/mlx-swift-lm/Libraries/MLXLLM/Models/Qwen4ExpMTP.swift`. Change the
-geometry that call selects. `docs/participant-contract.md` section 4.4 is the
-authority.
+loader is in the `Vendor/mlx-swift-lm` submodule. That submodule is pinned and
+it is not editable. No editable path holds the loader today, so a head
+re-quantization is not shippable through the editable surface.
+`docs/participant-contract.md` section 4.4 is the authority.
 
 A head only **proposes** tokens. The pinned target model decides every emitted
 token. The serial control leg always runs the embedded head.
 
 ### Batch size and draft depth
 
-> **NOTE — batch size is locked. Draft depth is not.**
-> The batch size stays 8. You may not tune it.
+> **NOTE — the scored batch size is locked. Draft depth is not.**
+> The scored batch size is 1. It is not a tunable.
 >
 > The draft depth is a free lever, and it is not pinned at 1. You declare it
 > in `mtp-head.manifest.json`, which is editable:
@@ -860,7 +859,6 @@ artifact.
 | Pins, the timed pool, scoring values | `fixtures/qwen3_8_125b_a6b_track.json` |
 | Why the manifest says what it says | `docs/participant-contract.md` |
 | The engineering log for this port | `docs/qwen38-125b-a6b-port-notes.md` |
-| The measured window and the decode target | `docs/timed-decode-evaluation.md` |
 | What CI covers | `docs/ci-coverage.md` |
 | Agent and contributor guidance | `AGENTS.md` |
 

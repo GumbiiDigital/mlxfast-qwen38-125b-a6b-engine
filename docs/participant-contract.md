@@ -277,15 +277,17 @@ You do not make a re-quantized checkpoint. Your code quantizes the head's
 parameters in memory, in the same pass that binds them. The staged bytes are
 only read.
 
-#### What to edit
+#### Where the seam is
 
-The head loader calls `quantize(model:)` while it binds the checkpoint. That
-call is the seam, and the file that holds it is an editable path:
-`Vendor/mlx-swift-lm/Libraries/MLXLLM/Models/Qwen4ExpMTP.swift`.
+The head loader is in the `Vendor/mlx-swift-lm` submodule. That submodule is
+pinned and it is not editable. No editable path holds the loader today, so a
+head re-quantization is not shippable through the editable surface.
 
-Change the geometry that call selects. The default reads the checkpoint's own
-quantization block. Your code may select a different geometry instead.
+The policy stays as written. A re-quantization of the pinned head is permitted.
+A replacement of the head is not, and head weights of your own are not. The
+declaration accepts `"source": "pinned"` only.
 
+The loader reads the checkpoint's own quantization block by default.
 Section 3.4 states the bounds the loader accepts: `group_size` positive and at
 most 65536, `bits` between 2 and 8, and at most 8192 per-layer overrides. A
 value outside those bounds is refused by name. The loader does not check a
@@ -645,6 +647,11 @@ The timed prompt pool is armed. All 8 `timed_prompt_pool[]` entries carry an
 `tools/ranked-box-preflight.sh` refuses a contract that still carries the
 `QWEN38-125B-A6B-MLX-PENDING-ORGANIZER` sentinel. The sentinel is matched
 exactly; it is never a prefix test.
+
+The six per-depth oracles hold the same bytes, and that is expected.
+Verification is greedy and lossless, so the emitted token sequence does not
+change with the draft depth. Each depth keeps its own file so that each depth
+has its own pin slot.
 
 ### 5.6 Which goldens you can hold
 
