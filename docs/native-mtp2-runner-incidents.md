@@ -28,3 +28,9 @@ Operational diagnosis belongs to the user/fleet operator: inspect the runner
 service and system logs around the disconnect, then repeat the serial control
 under the same declared calibration. The repository maintainer owns any harness
 or contract repair identified by those diagnostics.
+
+## Subsequent recovery attempts
+
+After updating to canonical main34978a1 (official pair count2), submission `c60468b4` [run34397134974](https://github.com/Layr-Labs/mlxfast-qwen38-125b-a6b-engine/actions/runs/34397134974) reached candidate work but failed with `runtime worker failed to clear the MLX allocator cache at phase start (cache_memory=2097152 bytes, expected 0)`. This is distinct from either earlier runner failure. Do not infer memory exhaustion from this message.
+
+The identical candidate retry `6eda356b` [run34398399641](https://github.com/Layr-Labs/mlxfast-qwen38-125b-a6b-engine/actions/runs/34398399641) completed on runner3:64 checked correctness steps, two measurement pairs, score1.0842064954306185. It was rejected below the existing1.1216070069077113 frontier, but produced a valid score. Neither the disconnect nor the allocator error recurred in that attempt; their root causes remain undetermined. No calibration or allocator gate was weakened.
