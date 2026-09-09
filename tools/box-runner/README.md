@@ -167,6 +167,12 @@ non-expansion inside a nested `bash -c`).
 
 ## Operation
 
+> **NOTE — the checkout must not be writable by `RUNNER_USER`.**
+> `supervisor.sh` runs as root under the LaunchDaemon. It sources
+> `box-runner.env` and `lib/pidtree.sh` from its own checkout directory. Make
+> root or the operator account the owner of the checkout that holds
+> `tools/box-runner`. Do not let `RUNNER_USER` write to it.
+
 ```sh
 # One-time box setup (creates RUNNER_DIR, LOG_DIR, STATE_DIR, seeds
 # box-runner.env, renders the plist -- does NOT install or load it):
