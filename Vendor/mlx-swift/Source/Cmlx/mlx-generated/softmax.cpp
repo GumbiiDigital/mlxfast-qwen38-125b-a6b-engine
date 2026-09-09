@@ -33,60 +33,6 @@ template <typename T, typename AccT = T, int N_READS = SOFTMAX_N_READS>
 
   constexpr int SIMD_SIZE = 32;
 
-  // The block dispatcher uses one SIMD group when axis_size <=
-  // SIMD_SIZE * N_READS. Keep the existing per-lane load and reduction order,
-  // but use SIMD registers instead of shared memory in this case.
-  if (axis_size <= SIMD_SIZE * N_READS) {
-    AccT ld[N_READS];
-
-    in += gid * size_t(axis_size) + lid * N_READS;
-    if (lid * N_READS + N_READS <= axis_size) {
-      for (int i = 0; i < N_READS; i++) {
-        ld[i] = AccT(in[i]);
-      }
-    } else {
-      for (int i = 0; i < N_READS; i++) {
-        ld[i] =
-            ((lid * N_READS + i) < axis_size) ? AccT(in[i]) : Limits<AccT>::min;
-      }
-    }
-
-    AccT maxval = Limits<AccT>::finite_min;
-    for (int i = 0; i < N_READS; i++) {
-      maxval = (maxval < ld[i]) ? ld[i] : maxval;
-    }
-    maxval = simd_max(maxval);
-    // The fallback second reduction sees lane 0's value and neutral values
-    // in all other lanes. Preserve that reduction without a fence.
-    maxval = simd_max(
-        (simd_lane_id == 0) ? maxval : Limits<AccT>::min);
-
-    AccT normalizer = 0;
-    for (int i = 0; i < N_READS; i++) {
-      AccT exp_x = softmax_exp(ld[i] - maxval);
-      ld[i] = exp_x;
-      normalizer += exp_x;
-    }
-    normalizer = simd_sum(normalizer);
-    // Match the fallback second sum over lane 0 plus zero in other lanes.
-    normalizer = simd_sum((simd_lane_id == 0) ? normalizer : AccT(0));
-    normalizer = 1 / normalizer;
-
-    out += gid * size_t(axis_size) + lid * N_READS;
-    if (lid * N_READS + N_READS <= axis_size) {
-      for (int i = 0; i < N_READS; i++) {
-        out[i] = T(ld[i] * normalizer);
-      }
-    } else {
-      for (int i = 0; i < N_READS; i++) {
-        if ((lid * N_READS + i) < axis_size) {
-          out[i] = T(ld[i] * normalizer);
-        }
-      }
-    }
-    return;
-  }
-
   threadgroup AccT local_max[SIMD_SIZE];
   threadgroup AccT local_normalizer[SIMD_SIZE];
 

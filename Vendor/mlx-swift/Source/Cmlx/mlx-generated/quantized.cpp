@@ -1008,6 +1008,7 @@ METAL_FUNC void qmv_wide_impl(
     const constant int& in_vec_size,
     const constant int& out_vec_size,
     const constant int& M,
+    threadgroup float* fold_partials,
     uint3 tid [[threadgroup_position_in_grid]],
     uint simd_gid [[simdgroup_index_in_threadgroup]],
     uint simd_lid [[thread_index_in_simdgroup]]) {
@@ -1017,12 +1018,30 @@ METAL_FUNC void qmv_wide_impl(
 
   typedef float U;
 
+  constexpr int rows_per_tg = results_per_simdgroup * num_simdgroups;
+
   const short k_lane = simd_lid % k_lanes;
   const short sg_row = simd_lid / k_lanes;
+  const short slot = simd_gid * results_per_simdgroup + sg_row;
 
-  const int out_row = tid.y * (results_per_simdgroup * num_simdgroups) +
-      results_per_simdgroup * simd_gid + sg_row;
+  const int tile_row0 = tid.y * rows_per_tg;
+  const int tile_rows = min(out_vec_size - tile_row0, rows_per_tg);
   const int vec0 = tid.x * vecs_per_tg;
+
+  // A tile shorter than rows_per_tg leaves whole slots recomputing the clamped
+  // last row and writing nothing. Give those slots a slice of K instead:
+  // k_folds slots share one output row and split its groups between them. Full
+  // tiles keep k_folds == 1 and run exactly the old partition.
+  int k_folds = 1;
+  int fold = 0;
+  int out_row = tile_row0 + slot;
+  if (tile_rows < rows_per_tg) {
+    while (k_folds * 2 * tile_rows <= rows_per_tg) {
+      k_folds *= 2;
+    }
+    fold = slot / tile_rows;
+    out_row = tile_row0 + slot % tile_rows;
+  }
 
   const int row = min(out_row, out_vec_size - 1);
 
@@ -1041,24 +1060,64 @@ METAL_FUNC void qmv_wide_impl(
 
   // Each lane reduces a strided subset of the row's groups: decode the group in
   // 8-value sub-chunks and reuse each chunk across the streamed vectors.
-  for (int g = k_lane; g < in_vec_size_g; g += k_lanes) {
+  const int g_stride = k_lanes * k_folds;
+  const int g_first = fold < k_folds ? k_lane + fold * k_lanes : in_vec_size_g;
+  for (int g = g_first; g < in_vec_size_g; g += g_stride) {
     U scale = srow[g];
     U bias = brow[g];
+    if (bits == 4) {
+      // A 4-bit group is word aligned, so read it as one 32-bit load per
+      // sub-chunk and issue the whole group's loads together. Same bytes in the
+      // same order, same arithmetic as dequantize<U, sub, 4>.
+      const device uint32_t* wg =
+          (const device uint32_t*)(wrow + g * (group_size * bits / 8));
+      uint32_t wpack[group_size / sub];
 #pragma unroll
-    for (int sc = 0; sc < group_size / sub; sc++) {
-      const int k0 = g * group_size + sc * sub;
-      const device uint8_t* wc = wrow + k0 * bits / 8;
-      U w_dq[sub];
-      dequantize<U, sub, bits>(wc, scale, bias, w_dq);
+      for (int sc = 0; sc < group_size / sub; sc++) {
+        wpack[sc] = wg[sc];
+      }
+      const float s = float(scale);
+      const float b = float(bias);
+      const float s_hi = s / 16.0f;
 #pragma unroll
-      for (int v = 0; v < vecs_per_tg; v++) {
-        const device T* xc = xv[v] + k0;
-        U acc = 0;
+      for (int sc = 0; sc < group_size / sub; sc++) {
+        const int k0 = g * group_size + sc * sub;
+        const uint32_t p = wpack[sc];
+        U w_dq[sub];
 #pragma unroll
-        for (int i = 0; i < sub; i++) {
-          acc += static_cast<U>(xc[i]) * w_dq[i];
+        for (int i = 0; i < sub / 2; i++) {
+          const uint32_t wbyte = (p >> (8 * i)) & 0xffu;
+          w_dq[2 * i] = static_cast<U>(s * (wbyte & 0x0fu) + b);
+          w_dq[2 * i + 1] = static_cast<U>(s_hi * (wbyte & 0xf0u) + b);
         }
-        result[v] += acc;
+#pragma unroll
+        for (int v = 0; v < vecs_per_tg; v++) {
+          const device T* xc = xv[v] + k0;
+          U acc = 0;
+#pragma unroll
+          for (int i = 0; i < sub; i++) {
+            acc += static_cast<U>(xc[i]) * w_dq[i];
+          }
+          result[v] += acc;
+        }
+      }
+    } else {
+#pragma unroll
+      for (int sc = 0; sc < group_size / sub; sc++) {
+        const int k0 = g * group_size + sc * sub;
+        const device uint8_t* wc = wrow + k0 * bits / 8;
+        U w_dq[sub];
+        dequantize<U, sub, bits>(wc, scale, bias, w_dq);
+#pragma unroll
+        for (int v = 0; v < vecs_per_tg; v++) {
+          const device T* xc = xv[v] + k0;
+          U acc = 0;
+#pragma unroll
+          for (int i = 0; i < sub; i++) {
+            acc += static_cast<U>(xc[i]) * w_dq[i];
+          }
+          result[v] += acc;
+        }
       }
     }
   }
@@ -1083,7 +1142,32 @@ METAL_FUNC void qmv_wide_impl(
     }
   }
 
-  if (k_lane == 0 && out_row < out_vec_size) {
+  if (k_folds > 1) {
+    // Fold f of row r lives in slot f * tile_rows + r, so slot r sums the folds
+    // of its own row in ascending fold order and writes it out.
+    if (k_lane == 0) {
+      for (int v = 0; v < vecs_per_tg; v++) {
+        fold_partials[slot * vecs_per_tg + v] = result[v];
+      }
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    if (k_lane == 0 && slot < tile_rows) {
+      for (int v = 0; v < vecs_per_tg; v++) {
+        U total = fold_partials[slot * vecs_per_tg + v];
+        for (int f = 1; f < k_folds; f++) {
+          total += fold_partials[(slot + f * tile_rows) * vecs_per_tg + v];
+        }
+        if (vec0 + v < M) {
+          y[(vec0 + v) * out_vec_size + out_row] = static_cast<T>(total);
+        }
+      }
+    }
+    return;
+  }
+
+  // fold is 0 for every full tile; a short tile whose spare slots did not reach
+  // a second fold leaves them holding nothing, so they must not write.
+  if (k_lane == 0 && fold == 0 && out_row < out_vec_size) {
     for (int v = 0; v < vecs_per_tg; v++) {
       if (vec0 + v < M) {
         y[(vec0 + v) * out_vec_size + out_row] = static_cast<T>(result[v]);
@@ -1900,6 +1984,7 @@ template <
         b_strides,
         tid);
   }
+  threadgroup float fold_partials[(SIMD_SIZE / k_lanes) * 2 * vecs_per_tg];
   qmv_wide_impl<T, group_size, bits, vecs_per_tg, k_lanes>(
       w,
       scales,
@@ -1909,6 +1994,7 @@ template <
       in_vec_size,
       out_vec_size,
       M,
+      fold_partials,
       tid,
       simd_gid,
       simd_lid);

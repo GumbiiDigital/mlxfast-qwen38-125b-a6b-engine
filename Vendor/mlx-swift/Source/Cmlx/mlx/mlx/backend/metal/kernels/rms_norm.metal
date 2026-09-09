@@ -42,13 +42,11 @@ template <typename T, int N_READS = RMS_N_READS>
     }
   }
   acc = simd_sum(acc);
-  // Only unused reduction slots need zero initialization. Each active SIMD
-  // group's lane 0 writes its own slot before the following barrier.
-  uint simd_groups =
-      (axis_size + SIMD_SIZE * N_READS - 1) / (SIMD_SIZE * N_READS);
-  if (simd_group_id == 0 && simd_lane_id >= simd_groups) {
+  //  Initialize shared memory
+  if (simd_group_id == 0) {
     local_sums[simd_lane_id] = 0;
   }
+  threadgroup_barrier(mem_flags::mem_threadgroup);
 
   // Write simd accumulations into shared memory
   if (simd_lane_id == 0) {
