@@ -259,6 +259,7 @@ jobs:
       # ("GPU_LOADED_UTIL Telemetry loaded/steady util threshold (default 0.70;
       # env-driven)"), so leaving it unset takes the same value without asserting
       # a track-specific derivation nobody has done yet.
+      MLXFAST_BENCH_WORKER_EXECUTABLE: .build-worker/release/track-bench-worker
       MLXFAST_MACMON_CANDIDATES: /opt/homebrew/bin/macmon
       # THE TIMED-POOL TAPES ARE NOT NAMED HERE. They are organizer material
       # published in R2 and staged on the box out of band, so no checkout
