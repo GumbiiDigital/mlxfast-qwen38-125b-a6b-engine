@@ -643,8 +643,9 @@ exactly; it is never a prefix test.
 | Object | Where it lives | Can you have it? |
 |---|---|---|
 | `correctness_prompts/public_longcopy_gate_english_1024_256.json` and `..._1024_1024.json` | Checked into git | **Yes.** They are already in your clone. See section 11.3. |
-| `timed_prompt_pool[]`, 8 tapes | Staged on the ranked box, pinned by `{sha256, bytes}` in the fixture. | **No.** The box receives them out of band and the preflight verifies them. |
-| `hidden_correctness_golden` | Staged on the ranked box, pinned by `{sha256, bytes}`. | **No.** It is the token-fidelity oracle. |
+| `timed_prompt_pool[]`, 8 tapes | R2, at the `r2_path` keys the fixture pins. The ranked box stages them out of band into `MLXFAST_QWEN38_GOLDEN_DIR`. | **No.** They are organizer material and they are never in git. |
+| `live_golden_speculative{}`, 6 per-depth oracles | The same: R2 keys, staged on the box. | **No.** Same material, same handling. |
+| `hidden_correctness_golden` | The live golden, pinned by digest only. It is one of the staged files. | **No.** It is the token-fidelity oracle and it stays on the box. |
 | The reference tree (`MLXFAST_BASELINE_WORKSPACE`) | Built on the ranked box at `baseline_reference_commit`. | **No.** It is the serial-control leg's engine. Its commit is public: the fixture names it. |
 
 `tools/fetch-goldens.sh` is the organizer-side, pin-verified fetcher for R2
@@ -657,6 +658,22 @@ declares hidden, and that guard fails closed when it cannot read the contract.
 > **NOTE — this repository pins no public golden for that tool to fetch.**
 > A participant has nothing to fetch with it today. Whether to publish a public
 > local-calibration golden is an organizer decision.
+
+The organizer stages the whole pinned set on a ranked box with the same tool.
+`--all` reads the fixture, fetches every tape and every per-depth oracle, and
+verifies each one against its `{sha256, bytes}` pin. It signs the requests with
+the signer vendored at `tools/download-r2-object.sh`, so it needs R2 credentials
+and refuses without them. A file that already matches its pin is left alone, so
+the command is safe to re-run:
+
+```bash
+R2_BUCKET_ENDPOINT=... R2_ACCESS_KEY_ID=... R2_SECRET_ACCESS_KEY=... \
+  tools/fetch-goldens.sh --all --out "$MLXFAST_QWEN38_GOLDEN_DIR"
+tools/ranked-box-preflight.sh
+```
+
+The preflight then verifies the staged directory against the fixture again and
+refuses an extra `*.json` in it.
 
 ## 6. Running the benchmark
 
@@ -729,8 +746,8 @@ The ranked pipeline is `.github/workflows/benchmark.yml`, which `benchmark.json`
 `runner.workflow` names. It triggers on `workflow_dispatch` only. Its hosted
 surface-check job gates its ranked job, which runs on the self-hosted labels
 `[self-hosted, macOS, qwen3.8-125b-a6b-mlx-v1]` — the third label is the track id.
-The ranked job holds no credential. The organizer stages the hidden timed-pool
-tapes onto the box. Before `./setup.sh` runs, `tools/ranked-box-preflight.sh`
+The ranked job holds no credential. The organizer stages the timed-pool tapes
+onto the box out of band, from R2; they are never in the checkout. Before `./setup.sh` runs, `tools/ranked-box-preflight.sh`
 verifies each tape against this track's `{sha256, bytes}` pins. One ranked run
 occupies
 the box at a time. A second dispatch queues rather than cancelling the first.

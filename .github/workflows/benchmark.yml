@@ -260,10 +260,11 @@ jobs:
       # env-driven)"), so leaving it unset takes the same value without asserting
       # a track-specific derivation nobody has done yet.
       MLXFAST_MACMON_CANDIDATES: /opt/homebrew/bin/macmon
-      # The timed-pool goldens ride in the checkout (correctness_prompts/<track>/,
-      # pin-verified by the preflight against the fixture), the same way the
-      # CUDA track stages them; a runner environment value wins when set.
-      MLXFAST_QWEN38_GOLDEN_DIR: ${{ github.workspace }}/correctness_prompts/qwen3.8-125b-a6b-mlx-v1
+      # THE TIMED-POOL TAPES ARE NOT NAMED HERE. They are organizer material
+      # published in R2 and staged on the box out of band, so no checkout
+      # carries them and there is nothing here to point at. The runner service
+      # exports MLXFAST_QWEN38_GOLDEN_DIR, and the step below refuses a box that
+      # does not.
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
@@ -284,7 +285,11 @@ jobs:
           # design (David 2026-09-08): the serial-control leg runs on the
           # organizer-staged reference tree, so an absent tree is an absent
           # denominator. The tree's identity is checked in the next step.
-          for var in BENCHD_BIN_DIR MLXFAST_REFERENCE_DIR MLXFAST_FORK_MIRROR MLXFAST_BASELINE_WORKSPACE; do
+          # MLXFAST_QWEN38_GOLDEN_DIR holds the staged track goldens. They are
+          # organizer material published in R2 and staged on the box out of
+          # band; they are never in the checkout, so an unset variable here has
+          # no in-repo copy to fall back on and is refused.
+          for var in BENCHD_BIN_DIR MLXFAST_REFERENCE_DIR MLXFAST_FORK_MIRROR MLXFAST_BASELINE_WORKSPACE MLXFAST_QWEN38_GOLDEN_DIR; do
             eval "value=\${${var}:-}"
             if [[ -z "${value}" ]]; then
               echo "::error::${var} is not exported by the runner service environment (the box runbook stages the asset and exports its path)" >&2
@@ -321,7 +326,7 @@ jobs:
             command -v "${tool}" >/dev/null 2>&1 || { echo "::error::${tool} is not on the runner service PATH" >&2; fail=1; }
           done
           [[ "${fail}" == "0" ]] || exit 1
-          echo "runner environment ok: benchd=${BENCHD_BIN_DIR} reference=${MLXFAST_REFERENCE_DIR} baseline_workspace=${MLXFAST_BASELINE_WORKSPACE} baseline_calibration=${MLXFAST_BASELINE_CALIBRATION} swift=$(command -v swift) prestaged_metallib=${{ inputs.prestaged_metallib }}"
+          echo "runner environment ok: benchd=${BENCHD_BIN_DIR} reference=${MLXFAST_REFERENCE_DIR} baseline_workspace=${MLXFAST_BASELINE_WORKSPACE} baseline_calibration=${MLXFAST_BASELINE_CALIBRATION} goldens=${MLXFAST_QWEN38_GOLDEN_DIR} swift=$(command -v swift) prestaged_metallib=${{ inputs.prestaged_metallib }}"
 
       - name: Populate the engine fork from the box-staged mirror (no credential)
         # The ranked checkout is submodules:false and holds no credential, and
