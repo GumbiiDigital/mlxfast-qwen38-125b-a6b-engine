@@ -70,7 +70,7 @@
     "sha256": "f2ce88adeabf4881bcbf27e04ccd53dfeaa932076e20db6d8943be2ac030a704",
     "bytes": 53571
   },
-  "baseline_reference_commit": "0000000000000000000000000000000000000000",
+  "baseline_reference_commit": "36d3291e3bede1b1259819d3e9913e39fd1fe654",
   "mlx_swift_lm_revision": "449f2d01b39f9088739c98d80a4f8a1b3cfa105e",
   "target": {
     "upstream_model_id": "Vontra/Qwen3.8-Flash-Next-MLX-4bit-MTP",
