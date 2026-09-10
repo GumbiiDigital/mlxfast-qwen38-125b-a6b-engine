@@ -88,7 +88,8 @@ public final class TrackQwen4ExpInlineMTPAssistant {
             multiStream: multiStream,
             embedTokens: embedTokens,
             cache: cache,
-            stepIndex: stepIndex)
+            stepIndex: stepIndex,
+            lastOnly: true)
         let last = step.sample.dim(1) - 1
         let lastSample = step.sample[0..., last..., 0...]
         let lastMulti = step.multi[0..., last..., 0...]
