@@ -26,8 +26,9 @@ enum TrackFastMixerKernels {
 
     /// normed [S, KD] -> lo [S, ND] (down), inj [S, HC] (inject).
     /// S == 1: each simdgroup owns downRowsPerSimdgroup adjacent down rows.
-    /// S > 1 retains 8 rows/tile. Inject always retains its own two-simdgroup tile.
-    /// grid threads (32, 2 * (ND/(2*RPS) + (HAS_INJECT ? 1 : 0)), 1), tg (32, 2, 1).
+    /// S == 1: two inject tiles each own two rows, one per simdgroup.
+    /// S > 1 retains 8 down rows/tile and one two-simdgroup inject tile.
+    /// grid threads (32, 2 * tiles, 1), tg (32, 2, 1).
     static let downInjectSource = """
         const int tile = (int)threadgroup_position_in_grid.y;
         const uint sg = simdgroup_index_in_threadgroup;
@@ -61,7 +62,15 @@ enum TrackFastMixerKernels {
             }
         } else if (HAS_INJECT) {
             if constexpr (VPT == 1) {
-                track_inject_qmv<T, GS, BITS, KD, HC, 4>(wi, si, bi, normed, inj, sg, lid);
+                // MLXFAST-INJSPLIT: only ownership changes; each row keeps its K walk.
+                static_assert(HC == 4, "one-row inject tiles require four HC rows");
+                const int row = (tile - NT) * 2 + (int)sg;
+                switch (row) {
+                    case 0: track_inject_qmv_row<T, GS, BITS, KD, 0>(wi, si, bi, normed, inj, lid); break;
+                    case 1: track_inject_qmv_row<T, GS, BITS, KD, 1>(wi, si, bi, normed, inj, lid); break;
+                    case 2: track_inject_qmv_row<T, GS, BITS, KD, 2>(wi, si, bi, normed, inj, lid); break;
+                    case 3: track_inject_qmv_row<T, GS, BITS, KD, 3>(wi, si, bi, normed, inj, lid); break;
+                }
             } else {
                 threadgroup float fp[8 * VPT];
                 float r[VPT];
@@ -94,7 +103,8 @@ enum TrackFastMixerKernels {
         let inj = inject ?? down
         // MLXFAST-MIX2ROW: match the source-time row count; launch size stays 64.
         let rowsPerSimdgroup = S == 1 ? downRowsPerSimdgroup : 4
-        let tiles = ND / (2 * rowsPerSimdgroup) + (inject != nil ? 1 : 0)
+        // MLXFAST-INJSPLIT: add two inject tiles only to the one-token path.
+        let tiles = ND / (2 * rowsPerSimdgroup) + (inject != nil ? (S == 1 ? 2 : 1) : 0)
         let outs = (S == 1 ? downInjectKernel1 : downInjectKernel)(
             [normed, down.weight, down.scales, down.biases!, inj.weight, inj.scales, inj.biases!],
             template: [
