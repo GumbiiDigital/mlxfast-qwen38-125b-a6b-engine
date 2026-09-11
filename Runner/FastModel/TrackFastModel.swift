@@ -226,7 +226,7 @@ public final class TrackQwen4ExpFastModel: Module, @unchecked Sendable {
     /// inputs/outputs are appended here.
     nonisolated(unsafe) static var debugTaps: [(String, MLXArray)]? = nil
     /// Layers per partial dispatch inside a forward (0 = one dispatch per step).
-    nonisolated(unsafe) public static var asyncChunk: Int = 3  // MLXFAST-CHUNK3: 8 -> 16 submissions; 12 measured -0.41% so the gradient favours smaller
+    nonisolated(unsafe) public static var asyncChunk: Int = 1  // MLXFAST-CHUNK1: dispatch every layer; 12 was -0.30%, 3 was +1.46%, so probe the limit
 
     /// Kill switch for A/B: `TRACK_FAST_FORWARD=0` routes every forward to the
     /// wrapped model.
