@@ -168,6 +168,7 @@ struct TrackAttn {
 
 struct TrackMoE {
     let routerW32: MLXArray  // [E, H] float32
+    let routerW16: MLXArray  // [E, H] bf16: the values routerW32 was cast from
     let switchMLP: SwitchGLU
     /// The routed experts' quantized arrays, for the custom gather path.
     let expertGate: (w: MLXArray, s: MLXArray, b: MLXArray)
@@ -346,13 +347,17 @@ public final class TrackQwen4ExpFastModel: Module, @unchecked Sendable {
     static func bindMoE(_ m: Module, cfg: Qwen4ExpTextConfiguration) -> TrackMoE {
         let gate = m.trackChild("gate")
         let routerW: MLXArray
+        let routerW16: MLXArray
         switch TrackProj(gate) {
-        case .dense(let w): routerW = w.asType(.float32)
+        case .dense(let w):
+            routerW16 = w
+            routerW = w.asType(.float32)
         case .quant(let q):
-            routerW = dequantized(
+            routerW16 = dequantized(
                 q.weight, scales: q.scales, biases: q.biases, groupSize: q.groupSize,
                 bits: q.bits, mode: q.mode
-            ).asType(.float32)
+            )
+            routerW = routerW16.asType(.float32)
         }
         guard let switchMLP = m.trackChild("switch_mlp") as? SwitchGLU else {
             preconditionFailure("TrackFastModel: switch_mlp is not a SwitchGLU")
@@ -370,7 +375,7 @@ public final class TrackQwen4ExpFastModel: Module, @unchecked Sendable {
         let sd = TrackProj(shared.trackChild("down_proj"))
         let sharedGate = TrackProj(m.trackChild("shared_expert_gate"))
         return TrackMoE(
-            routerW32: routerW, switchMLP: switchMLP,
+            routerW32: routerW, routerW16: routerW16, switchMLP: switchMLP,
             expertGate: expert("gate_proj"), expertUp: expert("up_proj"), expertDown: expert("down_proj"),
             expertGroupSize: qdown.groupSize, expertBits: qdown.bits,
             sharedGateUp: TrackMultiProj([sg, su]),
@@ -571,7 +576,15 @@ public final class TrackQwen4ExpFastModel: Module, @unchecked Sendable {
     static func moeForwardShared(_ m: TrackMoE, _ x: MLXArray, inputF32: MLXArray? = nil) -> MLXArray {
         let prof = TrackFastProfile.prefill != nil && x.dim(1) >= TrackFastProfile.minWindow
         var pt = prof ? CFAbsoluteTimeGetCurrent() : 0
-        let logits = matmul(inputF32 ?? x.asType(.float32), m.routerW32.transposed())
+        let logits: MLXArray
+        if x.dim(0) == 1, x.dim(1) == 1, m.routerW16.dtype == .bfloat16, x.dim(2) % 128 == 0,
+            m.routerW16.dim(0) % 16 == 0, x.dim(2) < 16 * m.routerW16.dim(0), m.routerW16.dim(0) < 4096
+        {
+            let xf = (inputF32 ?? x.asType(.float32)).reshaped(x.dim(2))
+            logits = TrackFastMoEKernels.routerGemv(x: xf, w: m.routerW16).reshaped(1, 1, -1)
+        } else {
+            logits = matmul(inputF32 ?? x.asType(.float32), m.routerW32.transposed())
+        }
         if prof { TrackFastProfile.tick("moe.router", &pt, [logits]) }
         // Top-k + softmax in one launch (argpartition's stable order, softmax_single_row).
         if x.dim(0) == 1, x.dim(1) <= 8,

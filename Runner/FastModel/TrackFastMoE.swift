@@ -842,10 +842,11 @@ extension TrackFastMoEKernels {
         let lead = Array(logits.shape.dropLast())
         let R = lead.reduce(1, *)
         precondition(topK <= 32 && topK <= E && R >= 1 && R <= 8 && KD % 256 == 0)
+        let laneGroups = g != nil ? 2 : 1
         let outs = routeKernel(
             [logits.reshaped(R, E), x.reshaped(R, KD), g?.weight ?? x, g?.scales ?? x, g?.biases ?? x],
             template: [("E", E), ("K", topK), ("T", x.dtype), ("GS", g?.groupSize ?? 32), ("BITS", g?.bits ?? 4), ("KD", KD), ("VPT", R), ("HAS_GATE", g != nil)],
-            grid: (32, R * 2, 1), threadGroup: (32, 2, 1),
+            grid: (32, R * laneGroups, 1), threadGroup: (32, laneGroups, 1),
             outputShapes: [[R, topK], [R, topK], [R]], outputDTypes: [.uint32, .float32, x.dtype])
         return (outs[0].reshaped(lead + [topK]), outs[1].reshaped(lead + [topK]), outs[2].reshaped(lead))
     }
@@ -1878,5 +1879,61 @@ extension TrackFastMoEKernels {
             template: [("T", x.dtype), ("GS", groupSize), ("BITS", bits), ("VPT", M), ("K", K), ("N", N), ("M", M)],
             grid: (32, 2, 1), threadGroup: (32, 2, 1),
             outputShapes: [[M, N]], outputDTypes: [x.dtype])[0]
+    }
+}
+
+// One-token BF16 router GEMV. This mirrors MLX's float GEMV accumulation while
+// reading the original BF16 router matrix instead of a float32 copy.
+extension TrackFastMoEKernels {
+    static let routerGemvSource = """
+        constexpr int TM = 4, TN = 4, SN = 32, blockM = 16, blockN = 128;
+        const int tid_x = (int)threadgroup_position_in_grid.x;
+        const int simd_gid = (int)simdgroup_index_in_threadgroup;
+        const int simd_lid = (int)thread_index_in_simdgroup;
+        float result[TM] = {0};
+        float inter[TN];
+        float v_coeff[TN];
+        const int thrN = simd_lid;
+        const int simdM = simd_gid;
+        int bm = simdM * TM;
+        int bn = thrN * TN;
+        int out_row = tid_x * blockM + bm;
+        if (out_row >= N) return;
+        out_row = out_row + TM <= N ? out_row : N - TM;
+        const device T* mat = w + (size_t)out_row * (size_t)K;
+        const int n_iter = K / blockN;
+        for (int i = 0; i < n_iter; ++i) {
+            for (int tn = 0; tn < TN; tn++) { v_coeff[tn] = x[bn + tn]; }
+            int mat_offset = 0;
+            for (int tm = 0; tm < TM; tm++) {
+                for (int tn = 0; tn < TN; tn++) { inter[tn] = static_cast<float>(mat[mat_offset + bn + tn]); }
+                for (int tn = 0; tn < TN; tn++) { result[tm] += inter[tn] * v_coeff[tn]; }
+                mat_offset += K;
+            }
+            bn += blockN;
+        }
+        for (int tm = 0; tm < TM; tm++) {
+            for (ushort sn = (SN / 2); sn >= 1; sn >>= 1) {
+                result[tm] += simd_shuffle_down(result[tm], sn);
+            }
+        }
+        if (simd_lid == 0) {
+            for (int tm = 0; tm < TM; tm++) { out[out_row + tm] = result[tm]; }
+        }
+        """
+
+    nonisolated(unsafe) static let routerGemvKernel = MLXFast.metalKernel(
+        name: "track_router_gemv", inputNames: ["x", "w"], outputNames: ["out"],
+        source: routerGemvSource, ensureRowContiguous: true)
+
+    /// One-token x float32 [K], w BF16 [N,K] -> float32 logits [N].
+    static func routerGemv(x: MLXArray, w: MLXArray) -> MLXArray {
+        let K = w.dim(1), N = w.dim(0)
+        precondition(x.dtype == .float32 && x.size == K && w.dtype == .bfloat16)
+        precondition(K % 128 == 0 && K > 64 && K < 16 * N && N % 16 == 0 && N < 4096)
+        return routerGemvKernel(
+            [x.reshaped(K), w], template: [("T", w.dtype), ("K", K), ("N", N)],
+            grid: (32 * (N / 16), 1, 4), threadGroup: (32, 1, 4),
+            outputShapes: [[N]], outputDTypes: [.float32])[0]
     }
 }
