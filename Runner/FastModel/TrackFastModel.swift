@@ -714,18 +714,30 @@ public final class TrackQwen4ExpFastModel: Module, @unchecked Sendable {
         } else {
             embedded = p.embedding(ids, previousContext: devicePrevious()).asType(stream.dtype)
         }
-        let key = groupNorm(p.keyProj.apply(embedded), scale: p.normKeyScale)
-            .reshaped(B, S, hcCount, hidden)
-        let value = p.valueProj.apply(embedded)
-        let query = groupNorm(stream, scale: p.normQueryScale).reshaped(B, S, hcCount, hidden)
-        var gate = (key * query).sum(axis: -1, keepDims: true) / Foundation.sqrt(Float(hidden))
-        let floor = TrackFastKernels.scalar(Float(1e-6), dtype: gate.dtype)
-        gate = MLX.sqrt(maximum(MLX.abs(gate), floor)) * MLX.sign(gate)
-        let gated = (sigmoid(gate) * value[.ellipsis, .newAxis, 0...]).reshaped(B, S, wide)
-        let normed = groupNorm(gated, scale: p.normConvScale)
-        let full = concatenated([convState, normed], axis: 1)  // [1, n+S, wide]
-        let convolved = silu(
-            conv1d(full, p.convW, stride: 1, padding: 0, dilation: p.dilation, groups: wide))
+        // MLXFAST-PLEFUSE2: two unchanged GEMVs + prepare + convolution at S=1.
+        let full: MLXArray
+        let output: MLXArray
+        if S == 1, TrackPLEFusion.supports(p, stream: stream, hidden: hidden, hcCount: hcCount),
+            convState.shape == [1, 9, wide], convState.dtype == stream.dtype,
+            let fused = TrackPLEFusion.forward(
+                p, embedded: embedded, stream: stream, convState: convState, eps: eps)
+        {
+            (full, output) = fused
+        } else {
+            let key = groupNorm(p.keyProj.apply(embedded), scale: p.normKeyScale)
+                .reshaped(B, S, hcCount, hidden)
+            let value = p.valueProj.apply(embedded)
+            let query = groupNorm(stream, scale: p.normQueryScale).reshaped(B, S, hcCount, hidden)
+            var gate = (key * query).sum(axis: -1, keepDims: true) / Foundation.sqrt(Float(hidden))
+            let floor = TrackFastKernels.scalar(Float(1e-6), dtype: gate.dtype)
+            gate = MLX.sqrt(maximum(MLX.abs(gate), floor)) * MLX.sign(gate)
+            let gated = (sigmoid(gate) * value[.ellipsis, .newAxis, 0...]).reshaped(B, S, wide)
+            let normed = groupNorm(gated, scale: p.normConvScale)
+            full = concatenated([convState, normed], axis: 1)  // [1, n+S, wide]
+            let convolved = silu(
+                conv1d(full, p.convW, stride: 1, padding: 0, dilation: p.dilation, groups: wide))
+            output = gated + convolved
+        }
         do {
             if capture {
                 let n = p.stateLength
@@ -761,7 +773,7 @@ public final class TrackQwen4ExpFastModel: Module, @unchecked Sendable {
         } catch {
             preconditionFailure("TrackFastModel: PLE stage failed: \(error)")
         }
-        return gated + convolved
+        return output
     }
 
     /// Both tower streams. `caches` is the compact attention layout.
