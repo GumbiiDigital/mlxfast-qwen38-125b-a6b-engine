@@ -98,7 +98,7 @@ extension TrackFastKernels {
         if (lane == 0) { local_sums[sg] = acc; }
         threadgroup_barrier(mem_flags::mem_threadgroup);
         acc = simd_sum(local_sums[lane]);
-        const float inv_mean = metal::precise::rsqrt(acc / (float)H + eps);
+        const float inv_mean = metal::precise::rsqrt(acc / (float)H + as_type<float>((uint)EPS_BITS));
         for (int i = 0; i < N_READS; ++i) {
             const uint d = lid * N_READS + i;
             InT n = static_cast<InT>(thread_x[i] * inv_mean);
@@ -108,7 +108,7 @@ extension TrackFastKernels {
 
     nonisolated(unsafe) static let injectNormKernel = MLXFast.metalKernel(
         name: "track_inject_norm",
-        inputNames: ["residual", "out", "inject", "scale", "eps"],
+        inputNames: ["residual", "out", "inject", "scale"],
         outputNames: ["stream", "normed"],
         source: injectNormSource, header: exactHeader, ensureRowContiguous: true)
 
@@ -121,10 +121,10 @@ extension TrackFastKernels {
         precondition(hidden % 4 == 0 && hidden / 4 <= 1024)
         let hasInject = out != nil
         let outs = injectNormKernel(
-            [residual, out ?? residual, inject ?? residual, scale, MLXArray(eps)],
+            [residual, out ?? residual, inject ?? residual, scale],
             template: [
                 ("InT", residual.dtype), ("H", hidden), ("W", W), ("HC", hcCount),
-                ("HAS_INJECT", hasInject), ("TILE", tile),
+                ("HAS_INJECT", hasInject), ("TILE", tile), ("EPS_BITS", Int(eps.bitPattern)),
             ],
             grid: (hidden / 4, hcCount, B * S), threadGroup: (hidden / 4, 1, 1),
             outputShapes: [[B, S, W], [B, S, W]],
@@ -226,7 +226,7 @@ extension TrackFastKernels {
         if (lane == 0) { local_sums[0] = acc; }
         threadgroup_barrier(mem_flags::mem_threadgroup);
         acc = simd_sum(local_sums[lane]);
-        const float inv_mean = metal::precise::rsqrt(acc / (float)Dv + eps);
+        const float inv_mean = metal::precise::rsqrt(acc / (float)Dv + as_type<float>((uint)EPS_BITS));
         for (int i = 0; i < N_READS; ++i) {
             const uint d = lid * N_READS + i;
             InT n = w[d] * static_cast<InT>(thread_x[i] * inv_mean);
@@ -238,7 +238,7 @@ extension TrackFastKernels {
 
     nonisolated(unsafe) static let gatedRMSKernel = MLXFast.metalKernel(
         name: "track_gated_rms",
-        inputNames: ["y", "proj", "w", "eps"],
+        inputNames: ["y", "proj", "w"],
         outputNames: ["out"],
         source: gatedRMSSource, header: exactHeader, ensureRowContiguous: true)
 
@@ -248,10 +248,10 @@ extension TrackFastKernels {
         let B = y.dim(0), S = y.dim(1), Hv = y.dim(2), Dv = y.dim(3)
         precondition(Dv == 128)
         return gatedRMSKernel(
-            [y, proj, w, MLXArray(eps)],
+            [y, proj, w],
             template: [
                 ("InT", y.dtype), ("Hv", Hv), ("Dv", Dv), ("PW", proj.dim(2)),
-                ("Z_OFF", zOffset),
+                ("Z_OFF", zOffset), ("EPS_BITS", Int(eps.bitPattern)),
             ],
             grid: (32, Hv, B * S), threadGroup: (32, 1, 1),
             outputShapes: [[B, S, Hv * Dv]], outputDTypes: [y.dtype])[0]
@@ -300,7 +300,7 @@ extension TrackFastKernels {
         if (lane == 0) { local_sums[sg] = acc; }
         threadgroup_barrier(mem_flags::mem_threadgroup);
         acc = simd_sum(local_sums[lane]);
-        const float inv_mean = metal::precise::rsqrt(acc / (float)D + eps);
+        const float inv_mean = metal::precise::rsqrt(acc / (float)D + as_type<float>((uint)EPS_BITS));
         for (int i = 0; i < N_READS; ++i) {
             const uint d = lid * N_READS + i;
             const InT wgt = isQ ? qnorm[d] : knorm[d];
@@ -335,7 +335,7 @@ extension TrackFastKernels {
 
     nonisolated(unsafe) static let attnPrepKernel = MLXFast.metalKernel(
         name: "track_attn_prep",
-        inputNames: ["qkv", "qnorm", "knorm", "cosb", "sinb", "eps"],
+        inputNames: ["qkv", "qnorm", "knorm", "cosb", "sinb"],
         outputNames: ["qout", "kout", "vout"],
         source: attnPrepSource, header: exactHeader, ensureRowContiguous: true)
 
@@ -346,10 +346,10 @@ extension TrackFastKernels {
         let B = qkv.dim(0), S = qkv.dim(1)
         precondition(headDim % 4 == 0 && rotaryDims % 8 == 0 && cos.dim(1) == rotaryDims)
         let outs = attnPrepKernel(
-            [qkv, qNorm, kNorm, cos, sin, MLXArray(eps)],
+            [qkv, qNorm, kNorm, cos, sin],
             template: [
                 ("InT", qkv.dtype), ("D", headDim), ("HQ", heads), ("HK", kvHeads), ("S", S),
-                ("QW", qkv.dim(2)), ("ROT", rotaryDims),
+                ("QW", qkv.dim(2)), ("ROT", rotaryDims), ("EPS_BITS", Int(eps.bitPattern)),
             ],
             grid: (headDim / 4, heads + 2 * kvHeads, B * S), threadGroup: (headDim / 4, 1, 1),
             outputShapes: [[B, heads, S, headDim], [B, kvHeads, S, headDim], [B, kvHeads, S, headDim]],

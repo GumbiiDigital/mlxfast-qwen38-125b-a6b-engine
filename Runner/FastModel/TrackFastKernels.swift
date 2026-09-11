@@ -197,7 +197,7 @@ enum TrackFastKernels {
 
     nonisolated(unsafe) static let leanKernel = MLXFast.metalKernel(
         name: "track_gdn_lean",
-        inputNames: ["q", "k", "v", "g", "beta", "state_in", "T"],
+        inputNames: ["q", "k", "v", "g", "beta", "state_in"],
         outputNames: ["y", "state_out"],
         source: leanSource, ensureRowContiguous: true)
 
@@ -212,16 +212,16 @@ enum TrackFastKernels {
         let slots = capture ? B * T : B
         precondition(g.dk == 128 && g.dv == 128 && g.convDim % 128 == 0)
         let prof = TrackFastProfile.prefill != nil && T >= TrackFastProfile.minWindow
-        var pt = CFAbsoluteTimeGetCurrent()
+        var pt = prof ? CFAbsoluteTimeGetCurrent() : 0
         let prep = gdnPrep(
             proj: proj, convState: convState, convW: convW, negExpALog: negExpALog,
             dtBias: dtBias, T: T, capture: capture, geometry: g)
         if prof { TrackFastProfile.tick("gdn.prep", &pt, prep) }
         let rec = leanKernel(
-            [prep[0], prep[1], prep[2], prep[3], prep[4], stateIn, MLXArray(Int32(T))],
+            [prep[0], prep[1], prep[2], prep[3], prep[4], stateIn],
             template: [
                 ("InT", proj.dtype), ("StT", stateIn.dtype), ("Dk", g.dk), ("Dv", g.dv),
-                ("Hk", g.hk), ("Hv", g.hv), ("CAPTURE", capture),
+                ("Hk", g.hk), ("Hv", g.hv), ("CAPTURE", capture), ("T", T),
             ],
             grid: (32, g.dv, B * g.hv), threadGroup: (32, 4, 1),
             outputShapes: [[B, T, g.hv, g.dv], [slots, g.hv, g.dv, g.dk]],
