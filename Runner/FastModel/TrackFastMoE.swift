@@ -755,7 +755,7 @@ METAL_FUNC void qmv_impl(
 // `simd_sum`, multiply by the reciprocal).
 
 extension TrackFastMoEKernels {
-    /// logits f32 [R, E] -> idx uint32 [R, K], w f32 [R, K]. grid threads (32, R, 1), tg (32,1,1).
+    /// logits f32 [R, E] -> idx uint32 [R, K], w f32 [R, K].
     static let routeSource = """
         constexpr int E_PER = (E + 31) / 32;
         const uint row = threadgroup_position_in_grid.y;
@@ -813,7 +813,6 @@ extension TrackFastMoEKernels {
         float maxval = -FLT_MAX;
         for (int i = 0; i < N_READS; i++) { maxval = (maxval < ld[i]) ? ld[i] : maxval; }
         maxval = simd_max(maxval);
-        maxval = simd_max((lane == 0) ? maxval : -INFINITY);
         float normalizer = 0;
         for (int i = 0; i < N_READS; i++) {
             float exp_x = fast::exp(ld[i] - maxval);
@@ -821,7 +820,6 @@ extension TrackFastMoEKernels {
             normalizer += exp_x;
         }
         normalizer = simd_sum(normalizer);
-        normalizer = simd_sum((lane == 0) ? normalizer : 0.0f);
         normalizer = 1 / normalizer;
         for (int i = 0; i < N_READS; i++) {
             const int p = (int)lane * N_READS + i;
@@ -855,10 +853,11 @@ extension TrackFastMoEKernels {
         let lead = Array(logits.shape.dropLast())
         let R = lead.reduce(1, *)
         precondition(topK <= 32 && topK <= E && R >= 1 && R <= 8 && KD % 256 == 0)
+        let simdgroups = g == nil ? 1 : 2
         let outs = (R == 1 ? routeKernel1 : routeKernel)(
             [logits.reshaped(R, E), x.reshaped(R, KD), g?.weight ?? x, g?.scales ?? x, g?.biases ?? x],
             template: [("E", E), ("K", topK), ("T", x.dtype), ("GS", g?.groupSize ?? 32), ("BITS", g?.bits ?? 4), ("KD", KD), ("VPT", R), ("HAS_GATE", g != nil)],
-            grid: (32, R * 2, 1), threadGroup: (32, 2, 1),
+            grid: (32, R * simdgroups, 1), threadGroup: (32, simdgroups, 1),
             outputShapes: [[R, topK], [R, topK], [R]], outputDTypes: [.uint32, .float32, x.dtype])
         return (outs[0].reshaped(lead + [topK]), outs[1].reshaped(lead + [topK]), outs[2].reshaped(lead))
     }
