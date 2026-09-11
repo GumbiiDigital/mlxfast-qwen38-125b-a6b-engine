@@ -1192,41 +1192,55 @@ extension TrackFastMoEKernels {
         const int d0 = (int)threadgroup_position_in_grid.y * 4;
         const uint kw = (uint)F / 8;
         const uint kg = (uint)F / GS;
-        float prod[K][4];
+        const uint sgi = simdgroup_index_in_threadgroup;
+        const uint lid = thread_index_in_simdgroup;
+        // The K expert walks are independent of one another, so they are spread
+        // over KSG simdgroups; each product lands in threadgroup memory as the
+        // float it already was, and the epilogue folds them in the same k order.
+        threadgroup float prod[K][4];
+        threadgroup float shvT[4];
         float res[4];
-        for (int k = 0; k < K; ++k) {
+        // K % KSG == 0, so the trip count is the constant K / KSG and the loop
+        // still unrolls: each simdgroup keeps that many expert walks in flight.
+        for (int kk = 0; kk < K / KSG; ++kk) {
+            const int k = (int)sgi + kk * KSG;
             const uint z = t * K + k;
             const uint e = idx[z];
             const size_t eoff = (size_t)e * (size_t)H;
             const device T* xb = act + (size_t)z * (size_t)F;
-            if (FAST) { qmv_fast_reg<T, GS, BITS>(wd + eoff * kw, sd + eoff * kg, bd + eoff * kg, xb, F, d0, thread_index_in_simdgroup, res); }
-            else { qmv_reg<T, GS, BITS>(wd + eoff * kw, sd + eoff * kg, bd + eoff * kg, xb, F, d0, thread_index_in_simdgroup, res); }
+            if (FAST) { qmv_fast_reg<T, GS, BITS>(wd + eoff * kw, sd + eoff * kg, bd + eoff * kg, xb, F, d0, lid, res); }
+            else { qmv_reg<T, GS, BITS>(wd + eoff * kw, sd + eoff * kg, bd + eoff * kg, xb, F, d0, lid, res); }
             const float wk = w[z];
-            for (int i = 0; i < 4; ++i) { prod[k][i] = static_cast<float>(static_cast<T>(res[i])) * wk; }
+            if (lid == 0) {
+                for (int i = 0; i < 4; ++i) { prod[k][i] = static_cast<float>(static_cast<T>(res[i])) * wk; }
+            }
         }
         // Shared expert down rows d0..d0+3 for token t: one token routes to `qmv`'s
         // normal branch (K = 640), two to eight to `qmv_wide` (full tiles; a row's
         // walk does not depend on how many vectors share its tile).
-        T shv[4];
-        {
+        if (sgi == (KSG > K ? (uint)K : 0u)) {
             const device T* xs = act + (size_t)(BR + t) * (size_t)F;
             if constexpr (VPT == 1) {
                 float rs[4];
-                qmv_reg<T, GS, BITS>(wsd, ssd, bsd, xs, F, d0, thread_index_in_simdgroup, rs);
-                for (int i = 0; i < 4; ++i) { shv[i] = static_cast<T>(rs[i]); }
+                qmv_reg<T, GS, BITS>(wsd, ssd, bsd, xs, F, d0, lid, rs);
+                if (lid == 0) { for (int i = 0; i < 4; ++i) { shvT[i] = static_cast<float>(static_cast<T>(rs[i])); } }
             } else {
                 float rw[1];
-                qmv_wide_reg_full<T, GS, BITS, 1, 8, false>(wsd, ssd, bsd, xs, F, 1, d0 + (int)(thread_index_in_simdgroup / 8), thread_index_in_simdgroup, rw);
-                for (int i = 0; i < 4; ++i) { shv[i] = static_cast<T>(simd_shuffle(rw[0], (ushort)(i * 8))); }
+                qmv_wide_reg_full<T, GS, BITS, 1, 8, false>(wsd, ssd, bsd, xs, F, 1, d0 + (int)(lid / 8), lid, rw);
+                // The shuffles must run with the whole simdgroup active.
+                float sh4[4];
+                for (int i = 0; i < 4; ++i) { sh4[i] = static_cast<float>(static_cast<T>(simd_shuffle(rw[0], (ushort)(i * 8)))); }
+                if (lid == 0) { for (int i = 0; i < 4; ++i) { shvT[i] = sh4[i]; } }
             }
         }
-        if (thread_index_in_simdgroup == 0) {
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        if (sgi == 0 && lid == 0) {
             const T sg = mlx_sigmoid(gate[t]);
             for (int i = 0; i < 4; ++i) {
                 float col[K];
                 for (int k = 0; k < K; ++k) { col[k] = prod[k][i]; }
                 const T r = static_cast<T>(mlx_colsum_small_f32<K>(col));
-                const T sh = sg * shv[i];
+                const T sh = sg * static_cast<T>(shvT[i]);
                 out[(size_t)t * (size_t)H + (size_t)(d0 + i)] = r + sh;
             }
         }
@@ -1245,6 +1259,14 @@ extension TrackFastMoEKernels {
         source: downCombineSource, header: helpersCore + TrackFastKernels.exactHeader + regHelpers + wideDecls,
         ensureRowContiguous: true)
 
+    /// Simdgroups per down+combine threadgroup: the top-K expert walks of one
+    /// output tile are handed out round-robin over this many simdgroups, which
+    /// shortens each simdgroup's serial chain and drops the per-thread product
+    /// array into threadgroup memory. Every product and the fold order are
+    /// unchanged, so the output is bit-identical for any value.
+    static let downCombineSimdgroups =
+        ProcessInfo.processInfo.environment["MLXFAST_MOE_DOWN_SIMDGROUPS"].flatMap { Int($0) } ?? 2
+
     /// act [BR + S, F] (routed slots, then the shared expert per token), gate [S] pre-sigmoid.
     static func downCombine(
         wd: MLXArray, sd: MLXArray, bd: MLXArray, sharedDown: TrackQuantWeight, act: MLXArray,
@@ -1254,10 +1276,11 @@ extension TrackFastMoEKernels {
         let S = BR / topK
         precondition(BR % topK == 0 && H % 4 == 0 && bits == 4 && w.dtype == .float32 && S >= 1 && S <= 8)
         precondition(act.dim(0) == BR + S && gate.dim(0) == S && sharedDown.rows == H && !isFast(k: F, n: H))
+        let ksg = topK % downCombineSimdgroups == 0 ? downCombineSimdgroups : 1
         return (S == 1 ? downCombineKernel1 : downCombineKernel)(
             [wd, sd, bd, sharedDown.weight, sharedDown.scales, sharedDown.biases!, act, idx, w, gate],
-            template: [("T", act.dtype), ("GS", groupSize), ("BITS", bits), ("H", H), ("F", F), ("K", topK), ("FAST", isFast(k: F, n: H)), ("BR", BR), ("VPT", S)],
-            grid: (32, H / 4, S), threadGroup: (32, 1, 1),
+            template: [("T", act.dtype), ("GS", groupSize), ("BITS", bits), ("H", H), ("F", F), ("K", topK), ("FAST", isFast(k: F, n: H)), ("BR", BR), ("VPT", S), ("KSG", ksg)],
+            grid: (32, (H / 4) * ksg, S), threadGroup: (32, ksg, 1),
             outputShapes: [[S, H]], outputDTypes: [act.dtype])[0]
     }
 }
