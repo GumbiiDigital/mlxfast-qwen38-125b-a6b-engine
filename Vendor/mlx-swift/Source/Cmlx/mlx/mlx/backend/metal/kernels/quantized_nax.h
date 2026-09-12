@@ -1607,6 +1607,7 @@ METAL_FUNC void p17_affine_gather_qmm_rhs_nax(
     const constant int& N,
     const constant int& K,
     threadgroup T* Ws,
+    threadgroup T* As,
     uint3 tid,
     uint simd_group_id,
     uint simd_lane_id) {
@@ -1620,6 +1621,8 @@ METAL_FUNC void p17_affine_gather_qmm_rhs_nax(
   constexpr int pack_factor = get_pack_factor<bits, 8>();
   constexpr int bytes_per_pack = get_bytes_per_pack<bits>();
   constexpr int BK_padded = (BK + 16 / sizeof(T));
+  // MLXFAST-ASTAGE: the A tile gets the same padded leading dimension Ws uses.
+  constexpr int BKA_padded = BK_padded;
   using loader_w_t = QuantizedBlockLoader<
       T, BN, BK, BK_padded, transpose, WM * WN * SIMD_SIZE, group_size, bits>;
 
@@ -1682,9 +1685,14 @@ METAL_FUNC void p17_affine_gather_qmm_rhs_nax(
 
     NAXTile<AccumType, TM, TN> Dtile;
     Dtile.clear();
-    // Keep even inactive SIMD-group pointers within a real input row. Inactive
-    // groups still cooperate in weight loads and execute every barrier.
-    const device T* xn = x + size_t(tile_begin + (sg_active ? tm : 0)) * K;
+    // MLXFAST-ASTAGE: one threadgroup-uniform base. The A rows this tile needs
+    // are staged cooperatively, so no simdgroup walks the device pointer itself.
+    const device T* xb = x + size_t(tile_begin) * K;
+    const short tgp_thread = short(simd_group_id * SIMD_SIZE + simd_lane_id);
+    const short a_row = tgp_thread / 4;            // 0..BM-1
+    const short a_col = (tgp_thread % 4) * 16;     // 0,16,32,48
+    threadgroup T* a_dst = As + a_row * BKA_padded + a_col;
+    const bool a_live = a_row < tile_m;
 
     thread loader_w_t loader_w(
         wl + index * stride_w,
@@ -1707,6 +1715,30 @@ METAL_FUNC void p17_affine_gather_qmm_rhs_nax(
       for (int k = 0; k < K_it; k++) {
         threadgroup_barrier(mem_flags::mem_threadgroup);
         packed_w.store(loader_w.dst);
+        // MLXFAST-ASTAGE. Each simdgroup used to walk A itself: 16 rows of 64
+        // bytes at a 5,120-byte stride, per simdgroup, per kk1 -- and with
+        // WM = WN = 2 the pairs (0,1) and (2,3) issue IDENTICAL reads, so every
+        // A row of the tile is fetched twice. Staging it instead costs one
+        // cooperative, fully coalesced pass: 128 threads x 16 contiguous
+        // elements covers the whole BM x BK block, four threads to a row, one
+        // 128-byte line per row. It rides the barrier pair Ws already needs, so
+        // it adds no synchronization. Rows past `tile_m` are zeroed, which is
+        // what the `load_safe` path they replace produces for the same lanes;
+        // an out-of-range row can only ever reach its own Dtile row, and those
+        // rows are excluded by `store_slice` either way. Same values, same
+        // order, bit-identical output.
+        if (a_live) {
+          const device T* a_src = xb + size_t(a_row) * K + a_col;
+          STEEL_PRAGMA_UNROLL
+          for (short e = 0; e < 16; ++e) {
+            a_dst[e] = a_src[e];
+          }
+        } else {
+          STEEL_PRAGMA_UNROLL
+          for (short e = 0; e < 16; ++e) {
+            a_dst[e] = T(0);
+          }
+        }
         threadgroup_barrier(mem_flags::mem_threadgroup);
 
         // All lanes prefetch; Ws is not reused until the next reader barrier.
@@ -1723,11 +1755,8 @@ METAL_FUNC void p17_affine_gather_qmm_rhs_nax(
 
             volatile int compiler_barrier;
 
-            if constexpr (kAlignedM.value) {
-              Atile.load(xn + kk1, K);
-            } else {
-              Atile.load_safe(xn + kk1, K, short2(SK, sgp_sm));
-            }
+            Atile.template load<T, BKA_padded, 1>(
+                As + tm * BKA_padded + kk1);
 
             Btile.template load<T, BK_padded, 1>(Ws + tn * BK_padded + kk1);
 
@@ -1742,7 +1771,7 @@ METAL_FUNC void p17_affine_gather_qmm_rhs_nax(
           }
         }
 
-        xn += BK;
+        xb += BK;
       }
       threadgroup_barrier(mem_flags::mem_threadgroup);
 
@@ -1797,6 +1826,13 @@ template <
       bits>;
 
   threadgroup T Ws[transpose ? BN * BK_padded : BK * BN_padded];
+  // MLXFAST-ASTAGE: 32 x 72 bf16 = 4,608 B, only for the P17-eligible shape. An
+  // in-situ probe that added exactly this much untouched threadgroup memory to
+  // this kernel cost 0.8%, so the allocation is close to free here.
+  constexpr bool p17_shape =
+      metal::is_same_v<T, bfloat16_t> && group_size == 32 && bits == 4 &&
+      transpose && BM == 32 && BN == 64 && BK == 64 && WM == 2 && WN == 2;
+  threadgroup T As[p17_shape ? BM * BK_padded : 1];
 
   // P17 is a scheduling/load-address variant of THIS kernel, not a different
   // GEMM family. Ineligible shapes retain the original body byte for byte.
@@ -1807,7 +1843,7 @@ template <
         ((K == 2560 && N == 640) || (K == 640 && N == 2560))) {
       p17_affine_gather_qmm_rhs_nax<
           T, group_size, bits, BM, BN, BK, WM, WN, transpose>(
-          x, w, scales, biases, indices, y, M, N, K, Ws, tid,
+          x, w, scales, biases, indices, y, M, N, K, Ws, As, tid,
           simd_group_id, simd_lane_id);
       return;
     }
