@@ -576,15 +576,22 @@ public final class TrackQwen4ExpFastModel: Module, @unchecked Sendable {
     ) -> MLXArray {
         let B = x.dim(0), S = x.dim(1)
         let heads = cfg.attentionHeads, kvHeads = cfg.kvHeads, d = cfg.headDim
-        // A wide window takes the indexer tape from the full `index_qk_proj`
-        // below (its GEMM rounding depends on N), so the fourth part of this
-        // concatenation -- the narrow indexer-K projection -- is an unread
-        // tail. The three kept projections and their offsets are unchanged.
-        let qkv =
-            TrackP12Prefill.omitUnusedIndexer && TrackP12Prefill.eligible(x) && S > 8
+        let splitInputs: [MLXArray]?
+        let qkv: MLXArray
+        if TrackP12Prefill.splitAttention && TrackP12Prefill.eligible(x)
             && a.qkv.parts.count == 4
-            ? concatenated(a.qkv.parts.prefix(3).map { $0.apply(x) }, axis: -1)
-            : a.qkv.apply(x)  // q | gate | k | v | [indexer k]
+        {
+            let parts = a.qkv.parts.prefix(3).map { $0.apply(x) }
+            splitInputs = parts
+            qkv = parts[0]
+        } else {
+            splitInputs = nil
+            qkv =
+                TrackP12Prefill.omitUnusedIndexer && TrackP12Prefill.eligible(x)
+                && a.qkv.parts.count == 4
+                ? concatenated(a.qkv.parts.prefix(3).map { $0.apply(x) }, axis: -1)
+                : a.qkv.apply(x)
+        }
         // The indexer tape first: its truncation reads the pre-update offset.
         let idxKeys: MLXArray
         if S <= 8 {
@@ -595,9 +602,17 @@ public final class TrackQwen4ExpFastModel: Module, @unchecked Sendable {
         }
         _ = cache.updateIndexerTape(keys: idxKeys)
 
-        let prep = TrackFastKernels.attnPrep(
-            qkv: qkv, qNorm: a.qNormW, kNorm: a.kNormW, cos: rope.cos, sin: rope.sin,
-            heads: heads, kvHeads: kvHeads, headDim: d, rotaryDims: rotaryDims, eps: eps)
+        let prep: (q: MLXArray, k: MLXArray, v: MLXArray)
+        if let parts = splitInputs {
+            prep = TrackP12Prefill.attnPrepSplit(
+                qGate: parts[0], k: parts[1], v: parts[2],
+                qNorm: a.qNormW, kNorm: a.kNormW, cos: rope.cos, sin: rope.sin,
+                heads: heads, kvHeads: kvHeads, headDim: d, rotaryDims: rotaryDims, eps: eps)
+        } else {
+            prep = TrackFastKernels.attnPrep(
+                qkv: qkv, qNorm: a.qNormW, kNorm: a.kNormW, cos: rope.cos, sin: rope.sin,
+                heads: heads, kvHeads: kvHeads, headDim: d, rotaryDims: rotaryDims, eps: eps)
+        }
         let att = cache.updateAndAttend(
             queries: prep.q, keys: prep.k, values: prep.v,
             scale: attentionScale, sinks: nil, keepMask: nil)  // [B,HQ,S,D]

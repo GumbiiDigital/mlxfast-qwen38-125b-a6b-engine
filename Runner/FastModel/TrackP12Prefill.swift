@@ -62,6 +62,7 @@ enum TrackP12Prefill {
     static let sortedCombine = on("TRACK_P12_SORTED_COMBINE")
     static let splitShared = on("TRACK_P12_SPLIT_SHARED_INPUTS")
     static let omitUnusedIndexer = on("TRACK_P12_OMIT_UNUSED_INDEXER")
+    static let splitAttention = on("TRACK_P12_SPLIT_ATTN_INPUTS")
 
     /// Wide, batch-one, activation-dtype windows only: the decode and verify
     /// windows keep the fused projections and the small-window MoE kernels.
@@ -139,6 +140,42 @@ enum TrackP12Prefill {
         TrackFastKernels.GDNGeometry(
             projWidth: g.convDim, convDim: g.convDim, convKernel: g.convKernel,
             hk: g.hk, hv: g.hv, dk: g.dk, dv: g.dv, bOffset: g.bOffset, aOffset: g.aOffset)
+    }
+
+    nonisolated(unsafe) private static let splitAttnPrepKernel = MLXFast.metalKernel(
+        name: "track_p12_attn_prep_split_inputs",
+        inputNames: ["qkv", "kproj", "vproj", "qnorm", "knorm", "cosb", "sinb"],
+        outputNames: ["qout", "kout", "vout"],
+        source: addressVariant(
+            TrackFastKernels.attnPrepSource,
+            [
+                ("src = row * QW + 2 * HQ * D + hh * D;", "src = row * HK * D + hh * D;"),
+                ("src = row * QW + 2 * HQ * D + HK * D + hh * D;", "src = row * HK * D + hh * D;"),
+                ("qkv[src + d]", "vproj[src + d]"),
+                ("qkv[src + lid * N_READS + i]", "(isQ ? qkv : kproj)[src + lid * N_READS + i]"),
+            ]),
+        header: TrackFastKernels.exactHeader, ensureRowContiguous: true)
+
+    static func attnPrepSplit(
+        qGate: MLXArray, k: MLXArray, v: MLXArray,
+        qNorm: MLXArray, kNorm: MLXArray, cos: MLXArray, sin: MLXArray,
+        heads: Int, kvHeads: Int, headDim: Int, rotaryDims: Int, eps: Float
+    ) -> (q: MLXArray, k: MLXArray, v: MLXArray) {
+        let B = qGate.dim(0), S = qGate.dim(1)
+        precondition(headDim % 4 == 0 && rotaryDims % 8 == 0 && cos.dim(1) == rotaryDims)
+        precondition(qGate.dim(2) == 2 * heads * headDim)
+        precondition(k.shape == [B, S, kvHeads * headDim] && v.shape == k.shape)
+        precondition(k.dtype == qGate.dtype && v.dtype == qGate.dtype)
+        let outs = splitAttnPrepKernel(
+            [qGate, k, v, qNorm, kNorm, cos, sin],
+            template: [
+                ("InT", qGate.dtype), ("D", headDim), ("HQ", heads), ("HK", kvHeads), ("S", S),
+                ("QW", qGate.dim(2)), ("ROT", rotaryDims), ("EPS_BITS", Int(eps.bitPattern)),
+            ],
+            grid: (headDim / 4, heads + 2 * kvHeads, B * S), threadGroup: (headDim / 4, 1, 1),
+            outputShapes: [[B, heads, S, headDim], [B, kvHeads, S, headDim], [B, kvHeads, S, headDim]],
+            outputDTypes: [qGate.dtype, qGate.dtype, qGate.dtype])
+        return (outs[0], outs[1], outs[2])
     }
 
     // MARK: - 2. Routed experts: combine straight out of the sorted rows
