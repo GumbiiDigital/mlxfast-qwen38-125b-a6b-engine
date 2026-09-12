@@ -679,6 +679,8 @@ public final class TrackQwen4ExpFastModel: Module, @unchecked Sendable {
             // reference upcasts it to float32 and reads twice the bytes).
             let xf = (inputF32 ?? x.asType(.float32)).reshaped(x.dim(2))
             logits = TrackFastMoEKernels.routerGemv(x: xf, w: m.routerW16).reshaped(1, 1, -1)
+        } else if inputF32 == nil, let wide = TrackPrefillRouter.apply(x: x, w: m.routerW16) {
+            logits = wide
         } else {
             logits = matmul(inputF32 ?? x.asType(.float32), m.routerW32.transposed())
         }
