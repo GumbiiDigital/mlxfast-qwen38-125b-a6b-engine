@@ -499,7 +499,13 @@ public final class TrackQwen4ExpFastModel: Module, @unchecked Sendable {
             act = r.act; inj = r.inj
         } else {
             inj = hc.inject?.apply(normed) ?? lo  // [B,S,hc]
-            act = TrackFastKernels.siluHead(lo: lo, width: hc.lowrank)
+            if hc.hasInject,
+                let fused = TrackPrefillMixerAct.apply(hc.down, x: normed, width: hc.lowrank)
+            {
+                act = fused
+            } else {
+                act = TrackFastKernels.siluHead(lo: lo, width: hc.lowrank)
+            }
         }
         let w = hc.up.apply(act)  // [B,S,W], pre-sigmoid
         if Self.debugTaps != nil, !tag.isEmpty {
