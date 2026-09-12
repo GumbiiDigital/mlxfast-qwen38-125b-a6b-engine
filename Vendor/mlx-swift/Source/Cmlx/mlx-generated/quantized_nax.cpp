@@ -1721,9 +1721,22 @@ METAL_FUNC void p17_affine_gather_qmm_rhs_nax(
     // This specialization is threadgroup-uniform. A partial BM tile uses
     // safe loads/stores even for a full first SM, with identical live values.
     dispatch_bool(tile_m == BM, [&](auto kAlignedM) {
+      // MLXFAST-APREFETCH: the A block is fetched into registers one K block
+      // ahead, so its device latency is hidden behind the current block's MMAs
+      // instead of standing between the two barriers. This is the same software
+      // pipeline `PackedNAXGroup32` already gives the weight block; A just did
+      // not have one. 16 bf16 per thread, statically indexed, so it stays in
+      // registers. The values published to `As` are byte for byte what the
+      // in-place copy published, only fetched earlier.
+      T a_buf[16];
       PackedNAXGroup32 packed_w;
       if (K_it > 0) {
         packed_w.prefetch(loader_w);
+        if (a_live) {
+          const device T* a0 = xb + size_t(a_row) * K + a_col;
+          STEEL_PRAGMA_UNROLL
+          for (short e = 0; e < 16; ++e) { a_buf[e] = a0[e]; }
+        }
       }
       for (int k = 0; k < K_it; k++) {
         threadgroup_barrier(mem_flags::mem_threadgroup);
@@ -1741,10 +1754,9 @@ METAL_FUNC void p17_affine_gather_qmm_rhs_nax(
         // rows are excluded by `store_slice` either way. Same values, same
         // order, bit-identical output.
         if (a_live) {
-          const device T* a_src = xb + size_t(a_row) * K + a_col;
           STEEL_PRAGMA_UNROLL
           for (short e = 0; e < 16; ++e) {
-            a_dst[e] = a_src[e];
+            a_dst[e] = a_buf[e];
           }
         } else {
           STEEL_PRAGMA_UNROLL
@@ -1758,6 +1770,11 @@ METAL_FUNC void p17_affine_gather_qmm_rhs_nax(
         if (k + 1 < K_it) {
           loader_w.next();
           packed_w.prefetch(loader_w);
+          if (a_live) {
+            const device T* a_next = xb + BK + size_t(a_row) * K + a_col;
+            STEEL_PRAGMA_UNROLL
+            for (short e = 0; e < 16; ++e) { a_buf[e] = a_next[e]; }
+          }
         }
 
         STEEL_PRAGMA_UNROLL
