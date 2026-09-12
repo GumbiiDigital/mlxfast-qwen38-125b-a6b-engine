@@ -764,7 +764,7 @@ extension TrackFastMoEKernels {
         // Shared-expert gate (1 row, K = KD): one token routes to `qmv`'s small-N
         // branch (simdgroup 0), two to eight to `qmv_wide`'s short tile, which
         // folds K across the 8 slots of BOTH simdgroups.
-        if (HAS_GATE) {
+        if constexpr (HAS_GATE) {
             const device T* xr = x + (size_t)row * (size_t)KD;
             if constexpr (VPT == 1) {
                 track_inject_qmv<T, GS, BITS, KD, 1, 4>(wg, sgw, bgw, xr, gate + row, sg, lane);
@@ -852,7 +852,7 @@ extension TrackFastMoEKernels {
         let E = logits.dim(-1), KD = x.dim(-1)
         let lead = Array(logits.shape.dropLast())
         let R = lead.reduce(1, *)
-        precondition(topK <= 32 && topK <= E && R >= 1 && R <= 8 && KD % 256 == 0)
+        precondition(topK <= 32 && topK <= E && R >= 1 && (g == nil || R <= 8) && KD % 256 == 0)
         let simdgroups = g == nil ? 1 : 2
         let outs = (R == 1 ? routeKernel1 : routeKernel)(
             [logits.reshaped(R, E), x.reshaped(R, KD), g?.weight ?? x, g?.scales ?? x, g?.biases ?? x],
