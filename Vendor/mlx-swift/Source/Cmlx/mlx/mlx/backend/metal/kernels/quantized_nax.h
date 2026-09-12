@@ -839,6 +839,43 @@ struct QuantizedBlockLoader<
   }
 };
 
+// One group per lane. Keep only raw operands live across the current MMA.
+struct PackedNAXGroup32 {
+  uint4 words;
+  bfloat16_t scale;
+  bfloat16_t bias;
+
+  template <typename Loader>
+  void prefetch(const thread Loader& loader) thread {
+    static_assert(Loader::n_reads == 16 && Loader::pack_factor == 2);
+    // Four word loads also support batch offsets aligned to 4, not 16, bytes.
+    const device uint32_t* src =
+        reinterpret_cast<const device uint32_t*>(loader.src);
+    words = uint4(src[0], src[1], src[2], src[3]);
+    scale = *loader.scales;
+    bias = *loader.biases;
+  }
+
+  template <typename T>
+  void store(threadgroup T* dst) const thread {
+    static_assert(metal::is_same_v<T, bfloat16_t>);
+    const float s = float(scale);
+    const float b = float(bias);
+    float sc[2] = {s, s / 16.0f};
+    STEEL_PRAGMA_UNROLL
+    for (int j = 0; j < 4; j++) {
+      STEEL_PRAGMA_UNROLL
+      for (int i = 0; i < 4; i++) {
+        const uint8_t w = uint8_t(words[j] >> (8 * i));
+        dst[8 * j + 2 * i] =
+            static_cast<bfloat16_t>(sc[0] * (w & 0x0f) + b);
+        dst[8 * j + 2 * i + 1] =
+            static_cast<bfloat16_t>(sc[1] * (w & 0xf0) + b);
+      }
+    }
+  }
+};
+
 template <typename T>
 METAL_FUNC void adjust_matrix_offsets(
     const device T*& x,
@@ -1024,54 +1061,80 @@ METAL_FUNC void qmm_t_nax_tgp_impl(
 
   dispatch_bool(!is_unaligned_sm, [&](auto kAlignedM) {
     dispatch_bool(aligned_N || !is_unaligned_bn, [&](auto kAlignedN) {
-      for (int k = 0; k < K; k += BK) {
-        threadgroup_barrier(mem_flags::mem_threadgroup);
-        if constexpr (kAlignedN.value) {
-          loader_w.load_unsafe();
-        } else {
-          loader_w.load_safe(short2(BK, tgp_bn));
+      auto run = [&](auto kPrefetch) {
+        PackedNAXGroup32 packed_w;
+        if constexpr (kPrefetch.value) {
+          if (K > 0) {
+            packed_w.prefetch(loader_w);
+          }
         }
-
-        threadgroup_barrier(mem_flags::mem_threadgroup);
-
-        STEEL_PRAGMA_NO_UNROLL
-        for (int kk1 = 0; kk1 < BK; kk1 += SK) {
-          NAXTile<T, TM, TK> Atile;
-          NAXTile<T, TN, TK> Btile;
-
-          volatile int compiler_barrier;
-
-          if constexpr (kAlignedM.value) {
-            Atile.load(x + kk1, K);
+        for (int k = 0; k < K; k += BK) {
+          threadgroup_barrier(mem_flags::mem_threadgroup);
+          if constexpr (kPrefetch.value) {
+            packed_w.store(loader_w.dst);
+          } else if constexpr (kAlignedN.value) {
+            loader_w.load_unsafe();
           } else {
-            Atile.load_safe(x + kk1, K, short2(SK, sgp_sm));
+            loader_w.load_safe(short2(BK, tgp_bn));
           }
 
-          Btile.template load<T, BK_padded, 1>(Ws + tn * BK_padded + kk1);
+          threadgroup_barrier(mem_flags::mem_threadgroup);
 
-          tile_matmad_nax(
-              Dtile,
-              Atile,
-              metal::bool_constant<transpose_a>{},
-              Btile,
-              metal::bool_constant<transpose_b>{});
+          if constexpr (kPrefetch.value) {
+            if (k + BK < K) {
+              loader_w.next();
+              packed_w.prefetch(loader_w);
+            }
+          }
 
-          (void)compiler_barrier;
+          STEEL_PRAGMA_NO_UNROLL
+          for (int kk1 = 0; kk1 < BK; kk1 += SK) {
+            NAXTile<T, TM, TK> Atile;
+            NAXTile<T, TN, TK> Btile;
+
+            volatile int compiler_barrier;
+
+            if constexpr (kAlignedM.value) {
+              Atile.load(x + kk1, K);
+            } else {
+              Atile.load_safe(x + kk1, K, short2(SK, sgp_sm));
+            }
+
+            Btile.template load<T, BK_padded, 1>(Ws + tn * BK_padded + kk1);
+
+            tile_matmad_nax(
+                Dtile,
+                Atile,
+                metal::bool_constant<transpose_a>{},
+                Btile,
+                metal::bool_constant<transpose_b>{});
+
+            (void)compiler_barrier;
+          }
+
+          x += BK;
+          if constexpr (!kPrefetch.value) {
+            loader_w.next();
+          }
         }
 
-        x += BK;
-        loader_w.next();
-      }
+        // Store results to device memory
+        threadgroup_barrier(mem_flags::mem_threadgroup);
 
-      // Store results to device memory
-      threadgroup_barrier(mem_flags::mem_threadgroup);
-
-      if constexpr (kAlignedM.value && kAlignedN.value) {
-        Dtile.store(y + tm * N + tn, N);
-      } else if (kAlignedM.value && sgp_sn == SN) {
-        Dtile.store(y + tm * N + tn, N);
+        if constexpr (kAlignedM.value && kAlignedN.value) {
+          Dtile.store(y + tm * N + tn, N);
+        } else if (kAlignedM.value && sgp_sn == SN) {
+          Dtile.store(y + tm * N + tn, N);
+        } else {
+          Dtile.store_safe(y + tm * N + tn, N, short2(sgp_sn, sgp_sm));
+        }
+      };
+      if constexpr (
+          metal::is_same_v<T, bfloat16_t> && group_size == 32 && bits == 4 &&
+          aligned_N && BM == 64 && BN == 64 && BK == 64 && WM == 2 && WN == 2) {
+        dispatch_bool(M > 32 && K % BK == 0, run);
       } else {
-        Dtile.store_safe(y + tm * N + tn, N, short2(sgp_sn, sgp_sm));
+        run(metal::false_type{});
       }
     });
   });
@@ -1637,10 +1700,20 @@ METAL_FUNC void p17_affine_gather_qmm_rhs_nax(
     // This specialization is threadgroup-uniform. A partial BM tile uses
     // safe loads/stores even for a full first SM, with identical live values.
     dispatch_bool(tile_m == BM, [&](auto kAlignedM) {
+      PackedNAXGroup32 packed_w;
+      if (K_it > 0) {
+        packed_w.prefetch(loader_w);
+      }
       for (int k = 0; k < K_it; k++) {
         threadgroup_barrier(mem_flags::mem_threadgroup);
-        loader_w.load_unsafe();
+        packed_w.store(loader_w.dst);
         threadgroup_barrier(mem_flags::mem_threadgroup);
+
+        // All lanes prefetch; Ws is not reused until the next reader barrier.
+        if (k + 1 < K_it) {
+          loader_w.next();
+          packed_w.prefetch(loader_w);
+        }
 
         STEEL_PRAGMA_NO_UNROLL
         for (int kk1 = 0; kk1 < BK; kk1 += SK) {
@@ -1670,7 +1743,6 @@ METAL_FUNC void p17_affine_gather_qmm_rhs_nax(
         }
 
         xn += BK;
-        loader_w.next();
       }
       threadgroup_barrier(mem_flags::mem_threadgroup);
 
