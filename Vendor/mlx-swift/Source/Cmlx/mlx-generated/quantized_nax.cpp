@@ -1728,7 +1728,7 @@ METAL_FUNC void p17_affine_gather_qmm_rhs_nax(
           packed_w.prefetch(loader_w);
         }
 
-        STEEL_PRAGMA_NO_UNROLL
+        STEEL_PRAGMA_UNROLL
         for (int kk1 = 0; kk1 < BK; kk1 += SK) {
           if (sg_active) {
             NAXTile<T, TM, TK> Atile;
