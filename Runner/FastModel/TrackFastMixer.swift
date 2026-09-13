@@ -117,8 +117,10 @@ enum TrackFastMixerKernels {
     }
 
     /// lo [S, LW] (pre-silu), normed [S, HC*H], inj [S, HC] -> input [S, H], inject [S, HC].
-    /// Tile t owns columns 2t, 2t+1 across the HC streams (8 rows); slot s ->
-    /// row (2t + (s & 1)) + H * (s >> 1). grid threads (32, 2 * H/2, 1), tg (32, 2, 1).
+    /// Tile t owns columns 2t, 2t+1 across the HC streams (8 rows).
+    /// For S == 1, each SIMD group owns one column and its four HC rows.
+    /// For S > 1, slot s -> row (2t + (s & 1)) + H * (s >> 1), unchanged.
+    /// grid threads (32, 2 * H/2, 1), tg (32, 2, 1).
     static let upMixSource = """
         const int tile = (int)threadgroup_position_in_grid.y;
         const int d0 = 2 * tile;
@@ -126,34 +128,47 @@ enum TrackFastMixerKernels {
         const uint lid = thread_index_in_simdgroup;
         threadgroup float res[8][VPT];
         if constexpr (VPT == 1) {
+            static_assert(HC == 4, "one-token up mix requires four HC rows");
+            const int d = d0 + (int)sg;
             int rows[4];
-            for (int i = 0; i < 4; ++i) { const int s = (int)sg * 4 + i; rows[i] = d0 + (s & 1) + H * (s >> 1); }
+            for (int s = 0; s < 4; ++s) { rows[s] = d + H * s; }
             float r[4];
             qmv_reg_rows<T, GS, BITS, false, (LW % get_pack_factor<BITS, 32>()) == 0>(wu, su, bu, act, LW, rows, lid, r);
-            if (lid == 0) { for (int i = 0; i < 4; ++i) { res[(int)sg * 4 + i][0] = r[i]; } }
+            if (lid == 0) {
+                T acc = T(0);
+                for (int s = 0; s < 4; ++s) {
+                    const T w = static_cast<T>(r[s]);
+                    const T sgm = mlx_sigmoid(w);
+                    const T p = sgm * normed[s * H + d];
+                    acc = acc + p;
+                }
+                input[d] = acc;
+                if (EMIT_F32) { inputF[d] = static_cast<float>(acc); }
+            }
         } else {
             const int s = (int)sg * 4 + (int)(lid / 8);
             const int row = d0 + (s & 1) + H * (s >> 1);
             float r[VPT];
             qmv_wide_reg_full<T, GS, BITS, VPT, 8, false>(wu, su, bu, act, LW, VPT, row, lid, r);
             if ((lid % 8) == 0) { for (int v = 0; v < VPT; ++v) { res[s][v] = r[v]; } }
-        }
-        threadgroup_barrier(mem_flags::mem_threadgroup);
-        const uint t = sg * 32 + lid;
-        if (t < 2) {
-            const int d = d0 + (int)t;
-            for (int v = 0; v < VPT; ++v) {
-                T acc = T(0);
-                for (int s = 0; s < HC; ++s) {
-                    const T w = static_cast<T>(res[s * 2 + (int)t][v]);
-                    const T sgm = mlx_sigmoid(w);
-                    const T p = sgm * normed[(size_t)v * (size_t)(HC * H) + (size_t)(s * H + d)];
-                    acc = acc + p;
+            threadgroup_barrier(mem_flags::mem_threadgroup);
+            const uint t = sg * 32 + lid;
+            if (t < 2) {
+                const int d = d0 + (int)t;
+                for (int v = 0; v < VPT; ++v) {
+                    T acc = T(0);
+                    for (int s = 0; s < HC; ++s) {
+                        const T w = static_cast<T>(res[s * 2 + (int)t][v]);
+                        const T sgm = mlx_sigmoid(w);
+                        const T p = sgm * normed[(size_t)v * (size_t)(HC * H) + (size_t)(s * H + d)];
+                        acc = acc + p;
+                    }
+                    input[(size_t)v * (size_t)H + (size_t)d] = acc;
+                    if (EMIT_F32) { inputF[(size_t)v * (size_t)H + (size_t)d] = static_cast<float>(acc); }
                 }
-                input[(size_t)v * (size_t)H + (size_t)d] = acc;
-                if (EMIT_F32) { inputF[(size_t)v * (size_t)H + (size_t)d] = static_cast<float>(acc); }
             }
         }
+        const uint t = sg * 32 + lid;
         if (HAS_INJECT && tile == 0 && t < (uint)(HC * VPT)) {
             const T x = inj[t];
             inject[t] = T(2) * mlx_sigmoid(x);
