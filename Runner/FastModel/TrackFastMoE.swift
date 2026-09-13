@@ -2118,13 +2118,13 @@ extension TrackFastMoEKernels {
 // MARK: router GEMV for one-token windows: MLX's float `gemv` kernel
 //       (GEMVKernel<float, BM=4, BN=1, SM=1, SN=32, TM=4, TN=4>, the
 //       parameters `gemv_axbpy` selects for a [512 x 2560] matrix and a
-//       2560-vector) verbatim, reading the bf16 router weight instead of a
-//       float32 copy: bf16 -> float is exact, so every product and every
-//       partial sum is the reference's.
+//       2560-vector). Each row keeps that walk while the target shape assigns
+//       two rows per SIMD group. Reading bf16 weights instead of a float32
+//       copy preserves every product and partial sum.
 
 extension TrackFastMoEKernels {
     static let routerGemvSource = """
-        constexpr int TM = 4, TN = 4, SN = 32, blockM = 16, blockN = 128;
+        constexpr int TM = RPS, TN = 4, SN = 32, blockM = 4 * RPS, blockN = 128;
         const int tid_x = (int)threadgroup_position_in_grid.x;
         const int simd_gid = (int)simdgroup_index_in_threadgroup;
         const int simd_lid = (int)thread_index_in_simdgroup;
@@ -2167,15 +2167,16 @@ extension TrackFastMoEKernels {
         source: routerGemvSource, ensureRowContiguous: true)
 
     /// x float32 [K], w bf16 [N, K] -> logits float32 [N]. One-token windows only
-    /// (MLX dispatches this exact kernel shape for K in [65, 16N) with N < 4096).
+    /// Retains MLX's per-row arithmetic for K in [65, 16N) with N < 4096.
     static func routerGemv(x: MLXArray, w: MLXArray) -> MLXArray {
         let K = w.dim(1), N = w.dim(0)
         precondition(x.dtype == .float32 && x.size == K && w.dtype == .bfloat16)
         precondition(K % 128 == 0 && K > 64 && K < 16 * N && N % 16 == 0 && N < 4096)
+        let rowsPerSimdgroup = K == 2560 && N == 512 ? 2 : 4
         return routerGemvKernel(
             [x.reshaped(K), w],
-            template: [("T", w.dtype), ("K", K), ("N", N)],
-            grid: (32 * (N / 16), 1, 4), threadGroup: (32, 1, 4),
+            template: [("T", w.dtype), ("K", K), ("N", N), ("RPS", rowsPerSimdgroup)],
+            grid: (32 * (N / (4 * rowsPerSimdgroup)), 1, 4), threadGroup: (32, 1, 4),
             outputShapes: [[N]], outputDTypes: [.float32])[0]
     }
 }
