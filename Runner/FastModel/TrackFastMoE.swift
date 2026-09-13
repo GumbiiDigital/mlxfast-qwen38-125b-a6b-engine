@@ -2124,7 +2124,9 @@ extension TrackFastMoEKernels {
 
 extension TrackFastMoEKernels {
     static let routerGemvSource = """
-        constexpr int TM = RPS, TN = 4, SN = 32, blockM = 4 * RPS, blockN = 128;
+        // Cycle24: target shape uses two SIMD groups/workgroup; arithmetic and
+        // one-row-per-group mapping remain unchanged while row scheduling is finer.
+        constexpr int TM = RPS, TN = 4, SN = 32, blockM = SG * RPS, blockN = 128;
         const int tid_x = (int)threadgroup_position_in_grid.x;
         const int simd_gid = (int)simdgroup_index_in_threadgroup;
         const int simd_lid = (int)thread_index_in_simdgroup;
@@ -2173,10 +2175,11 @@ extension TrackFastMoEKernels {
         precondition(x.dtype == .float32 && x.size == K && w.dtype == .bfloat16)
         precondition(K % 128 == 0 && K > 64 && K < 16 * N && N % 16 == 0 && N < 4096)
         let rowsPerSimdgroup = K == 2560 && N == 512 ? 1 : 4  // MLXFAST-ROUTERRPS1
+        let simdgroups = K == 2560 && N == 512 ? 2 : 4  // MLXFAST-ROUTER-SG2
         return routerGemvKernel(
             [x.reshaped(K), w],
-            template: [("T", w.dtype), ("K", K), ("N", N), ("RPS", rowsPerSimdgroup)],
-            grid: (32 * (N / (4 * rowsPerSimdgroup)), 1, 4), threadGroup: (32, 1, 4),
+            template: [("T", w.dtype), ("K", K), ("N", N), ("RPS", rowsPerSimdgroup), ("SG", simdgroups)],
+            grid: (32 * (N / (simdgroups * rowsPerSimdgroup)), 1, simdgroups), threadGroup: (32, 1, simdgroups),
             outputShapes: [[N]], outputDTypes: [.float32])[0]
     }
 }
