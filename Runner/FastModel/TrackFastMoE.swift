@@ -2172,7 +2172,7 @@ extension TrackFastMoEKernels {
         let K = w.dim(1), N = w.dim(0)
         precondition(x.dtype == .float32 && x.size == K && w.dtype == .bfloat16)
         precondition(K % 128 == 0 && K > 64 && K < 16 * N && N % 16 == 0 && N < 4096)
-        let rowsPerSimdgroup = K == 2560 && N == 512 ? 2 : 4
+        let rowsPerSimdgroup = K == 2560 && N == 512 ? 1 : 4  // MLXFAST-ROUTERRPS1
         return routerGemvKernel(
             [x.reshaped(K), w],
             template: [("T", w.dtype), ("K", K), ("N", N), ("RPS", rowsPerSimdgroup)],
